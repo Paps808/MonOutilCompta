@@ -433,6 +433,15 @@ const server = http.createServer(async (req, res) => {
         });
       }
       if (parts[1] === "me") return sendJson(res, 200, await billing.accountStatus(req));
+      if (parts[1] === "track" && req.method === "POST") {
+        const body = JSON.parse((await readBody(req, 10240)).toString() || "{}");
+        billing.trackEvent(req, body).catch(() => {}); // sans blocage : la réponse part tout de suite
+        return sendJson(res, 200, { ok: true });
+      }
+      if (parts[1] === "admin" && parts[2] === "stats") {
+        const r = await billing.adminStats(req);
+        return sendJson(res, r.status, r.body);
+      }
       if (parts[1] === "quota" && parts[2] === "pdf" && req.method === "POST") {
         const q = await billing.consumeQuota(req, "pdf");
         if (!q.allowed) return sendQuotaError(res, q);

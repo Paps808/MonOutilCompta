@@ -76,6 +76,43 @@ async function consumeQuota(req, kind) {
   }
 }
 
+// Journalisation d'un événement de fréquentation (fonctionne aussi sans compte)
+async function trackEvent(req, body) {
+  const token = bearerToken(req) || SUPABASE_ANON_KEY;
+  const args = {
+    p_type: String(body.type || "").slice(0, 20),
+    p_name: String(body.name || "").slice(0, 80),
+    p_lang: String(body.lang || "").slice(0, 8),
+    p_path: String(body.path || "").slice(0, 120),
+    p_session: String(body.session || "").slice(0, 40),
+  };
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/log_event`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(args),
+  });
+  return r.ok;
+}
+
+// Statistiques agrégées — réservé au compte administrateur
+async function adminStats(req) {
+  const token = bearerToken(req);
+  if (!token) return { status: 401, body: { error: "Connexion requise" } };
+  try {
+    const stats = await rpc("admin_stats", token);
+    if (stats && stats.error === "forbidden") {
+      return { status: 403, body: { error: "Réservé à l'administrateur" } };
+    }
+    return { status: 200, body: stats };
+  } catch (e) {
+    return { status: 502, body: { error: e.message } };
+  }
+}
+
 async function accountStatus(req) {
   const token = bearerToken(req);
   if (!token) return { authenticated: false };
@@ -244,4 +281,5 @@ module.exports = {
   SUPABASE_URL, SUPABASE_ANON_KEY, PRICES,
   STRIPE_READY: !!STRIPE_SECRET_KEY,
   consumeQuota, accountStatus, createCheckout, createPortal, handleWebhook,
+  trackEvent, adminStats,
 };

@@ -664,6 +664,25 @@ ping(); setInterval(ping, 15000);
 
 function goTab(name) { showTab(name); }
 
+/* ---------- statistiques de fréquentation ---------- */
+let _sessionId = localStorage.getItem("moc_sid");
+if (!_sessionId) {
+  _sessionId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  localStorage.setItem("moc_sid", _sessionId);
+}
+async function track(type, name) {
+  try {
+    await authFetch("/api/track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, name, lang: currentLang, path: location.pathname, session: _sessionId }),
+    });
+  } catch { /* la statistique n'est jamais bloquante */ }
+}
+window.addEventListener("load", () => track("visit", "page"));
+document.querySelectorAll("nav button").forEach(b =>
+  b.addEventListener("click", () => track("click", "onglet:" + b.dataset.tab)));
+
 /* ---------- compte / abonnement ---------- */
 let sb = null, me = null, siteCfg = null;
 
@@ -810,6 +829,19 @@ function renderAccount() {
     return;
   }
 
+  /* ----- connecté : administrateur → tableau de bord ----- */
+  if (me.is_admin) {
+    card.innerHTML = `
+      <div class="card">
+        <h2>📊 Tableau de bord administrateur</h2>
+        <p class="hint" style="margin:4px 0 0">Connecté en tant qu'administrateur.
+        <a href="#" onclick="acctLogout();return false" style="float:right">Se déconnecter</a></p>
+      </div>
+      <div id="admin-stats"><div class="card"><p class="hint">⏳ Chargement des statistiques…</p></div></div>`;
+    loadAdminStats();
+    return;
+  }
+
   /* ----- connecté : abonné ----- */
   if (me.subscribed) {
     card.innerHTML = `<div class="card">
@@ -875,8 +907,10 @@ function rebuildClient(storage) {
 async function acctLogin() {
   const remember = document.getElementById("acct-remember");
   if (remember && !remember.checked) rebuildClient(window.sessionStorage); // session close = déconnecté
+  let email = document.getElementById("acct-email").value.trim();
+  if (email && !email.includes("@")) email += "@moc.local"; // identifiant court (ex. administrateur)
   const { error } = await sb.auth.signInWithPassword({
-    email: document.getElementById("acct-email").value.trim(),
+    email,
     password: document.getElementById("acct-pass").value,
   });
   if (error) acctMsg("bad", "❌ " + esc(frAuthError(error.message)));
@@ -915,6 +949,40 @@ async function acctNewPassword() {
 }
 
 async function acctLogout() { authView = "login"; await sb.auth.signOut(); }
+
+async function loadAdminStats() {
+  const el = document.getElementById("admin-stats");
+  try {
+    const r = await authFetch("/api/admin/stats");
+    const s = await r.json();
+    if (!r.ok) { el.innerHTML = `<div class="card"><p class="hint">❌ ${esc(s.error || "Erreur")}</p></div>`; return; }
+    const table = (rows, c1, c2) => rows && rows.length
+      ? `<div class="kv" style="margin-top:8px">${rows.map(x => `<span class="k">${esc(String(x[c1]))}</span><span class="v">${esc(String(x[c2]))}</span>`).join("")}</div>`
+      : `<p class="hint" style="margin:8px 0 0">Aucune donnée pour l'instant.</p>`;
+    const maxJ = Math.max(1, ...(s.visites_par_jour || []).map(d => d.visites));
+    const barres = (s.visites_par_jour || []).map(d => `
+      <div style="display:flex;align-items:center;gap:10px;margin-top:5px">
+        <span style="width:84px;font-size:.78rem;color:var(--muted)">${esc(d.jour.slice(5))}</span>
+        <div style="flex:1;background:#101016;border-radius:5px;height:16px;overflow:hidden">
+          <div style="width:${Math.round(d.visites / maxJ * 100)}%;height:100%;background:linear-gradient(90deg,#c8933a,#e0b054)"></div>
+        </div>
+        <span style="width:40px;text-align:right;font-size:.82rem">${d.visites}</span>
+      </div>`).join("");
+    el.innerHTML = `
+      <div class="tiles" style="margin-top:16px">
+        <div class="tile"><span class="k">Visites totales</span><span class="v">${s.visites_total}</span><span class="sub">${s.visiteurs_uniques} visiteur(s) unique(s)</span></div>
+        <div class="tile"><span class="k">Visites — 30 jours</span><span class="v">${s.visites_30j}</span></div>
+        <div class="tile"><span class="k">Comptes clients</span><span class="v">${s.comptes_total}</span><span class="sub">+${s.comptes_7j} ces 7 derniers jours</span></div>
+        <div class="tile"><span class="k">Abonnés actifs</span><span class="v green">${s.abonnes_actifs}</span><span class="sub">${(s.abonnes_par_plan || []).map(p => `${p.total} ${p.plan === "yearly" ? "annuel(s)" : "mensuel(s)"}`).join(" · ") || "—"}</span></div>
+      </div>
+      <div class="card"><h2>📈 Visites — 14 derniers jours</h2>${barres || '<p class="hint" style="margin:8px 0 0">Aucune donnée pour l\'instant.</p>'}</div>
+      <div class="card"><h2>🛠️ Outils les plus utilisés</h2>${table(s.outils, "outil", "utilisations")}</div>
+      <div class="card"><h2>🖱️ Clics par zone</h2>${table(s.clics, "cible", "clics")}</div>
+      <div class="card"><h2>🌐 Langues des visiteurs</h2>${table(s.langues, "langue", "visites")}</div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="card"><p class="hint">❌ ${esc(e.message)}</p></div>`;
+  }
+}
 
 async function acctSubscribe(plan) {
   acctMsg("neutral", "⏳ Préparation du paiement sécurisé…");
@@ -977,6 +1045,7 @@ function calcTemporis() {
   const debut = new Date(d1 + "T00:00:00"), fin = new Date(d2 + "T00:00:00");
   if (fin < debut) return show("pt-result", "bad", "La date de fin est antérieure à la date de début.");
 
+  track("tool", "prorata");
   const totalJours = Math.round((fin - debut) / 86400000) + 1; // dates de début et fin incluses
   const prixJour = montant / totalJours;
 
@@ -1094,6 +1163,7 @@ async function checkTva() {
   if (!fmt[0].test(raw.slice(2))) {
     return show("tva-result", "bad", `Format incorrect pour ce pays. Format attendu : <b>${esc(fmt[1])}</b>.`);
   }
+  track("tool", "verification-tva");
   const btn = document.getElementById("tva-btn");
   btn.disabled = true; btn.textContent = "Interrogation de VIES…";
   show("tva-result", "neutral", "⏳ Consultation du service VIES de la Commission européenne…");
@@ -1165,6 +1235,7 @@ function nomPays(code) {
 async function checkIban() {
   const raw = document.getElementById("iban-num").value;
   if (!raw.trim()) return show("iban-result", "bad", "Saisissez un IBAN.");
+  track("tool", "validation-iban");
   const btn = document.getElementById("iban-btn");
   btn.disabled = true; btn.textContent = "Validation…";
   show("iban-result", "neutral", "⏳ Validation en cours…");
@@ -1352,6 +1423,7 @@ async function uiSplit() {
   const f = document.getElementById("split-file").files[0];
   if (!f) return show("split-result", "bad", "Choisissez un fichier PDF.");
   if (!(await pdfQuota("split-result"))) return;
+  track("tool", "pdf-division");
   show("split-result", "neutral", "⏳ Traitement en cours…");
   try {
     const s = splitState;
@@ -1419,6 +1491,7 @@ async function coreMerge(buffers) {
 async function uiMerge() {
   if (mergeOrder.length < 2) return show("merge-result", "bad", "Sélectionnez au moins deux fichiers PDF.");
   if (!(await pdfQuota("merge-result"))) return;
+  track("tool", "pdf-fusion");
   show("merge-result", "neutral", "⏳ Fusion en cours…");
   try {
     const buffers = [];
@@ -1513,6 +1586,7 @@ async function uiToWord() {
   if (!f) return show("word-result", "bad", "Choisissez un fichier PDF.");
   const prog = m => show("word-result", "neutral", "⏳ " + esc(m));
   try {
+    track("tool", "pdf-vers-word");
     prog("Analyse du document…");
     let buf = await f.arrayBuffer();
     // Détection scan : aucune ligne de texte extractible ?
@@ -1550,6 +1624,7 @@ async function uiOcr() {
   if (!f) return show("ocr-result", "bad", "Choisissez un PDF ou une image.");
   const lang = document.getElementById("ocr-lang").value;
   if (!(await pdfQuota("ocr-result"))) return;
+  track("tool", "ocr");
   const prog = m => show("ocr-result", "neutral", "⏳ " + esc(m));
   try {
     prog("Chargement du moteur OCR (première fois : ~15 Mo)…");
