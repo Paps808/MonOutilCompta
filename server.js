@@ -16,11 +16,11 @@ const ROOT = __dirname;
 
 /* ---------- utilitaires ---------- */
 
-function fetchJson(url, { timeout = 10000 } = {}) {
+function fetchJson(url, { timeout = 10000, headers = {} } = {}) {
   return new Promise((resolve, reject) => {
     const req = https.get(
       url,
-      { headers: { "User-Agent": "OutilsPro/1.0", Accept: "application/json" }, timeout },
+      { headers: { "User-Agent": "MonOutilCompta/1.0", Accept: "application/json", ...headers }, timeout },
       (res) => {
         let data = "";
         res.on("data", (c) => (data += c));
@@ -73,11 +73,13 @@ function sendJson(res, status, obj) {
 /* ---------- TVA / VIES ---------- */
 
 async function handleVies(res, country, vatNumber) {
-  const cc = String(country || "").toUpperCase().replace(/[^A-Z]/g, "");
+  let cc = String(country || "").toUpperCase().replace(/[^A-Z]/g, "");
   const num = String(vatNumber || "").replace(/[^0-9A-Za-z]/g, "");
   if (!/^[A-Z]{2}$/.test(cc) || num.length < 2) {
     return sendJson(res, 400, { error: "Numéro de TVA invalide. Format attendu : BE0123456789" });
   }
+  if (cc === "GR") cc = "EL"; // la Grèce utilise le préfixe EL dans VIES
+  if (cc === "GB") return handleHmrc(res, num); // Royaume-Uni : hors VIES depuis le Brexit, API HMRC
   try {
     const { status, json, raw } = await fetchJson(
       `https://ec.europa.eu/taxation_customs/vies/rest-api/ms/${cc}/vat/${num}`,
@@ -104,6 +106,22 @@ async function handleVies(res, country, vatNumber) {
   } catch (e) {
     sendJson(res, 502, { error: "Impossible de contacter le service VIES : " + e.message });
   }
+}
+
+// Royaume-Uni : depuis 2025, l'API HMRC exige une clé OAuth ; on contrôle le format
+// et on renvoie le lien du vérificateur officiel gov.uk.
+async function handleHmrc(res, num) {
+  if (!/^\d{9}(\d{3})?$/.test(num) && !/^(GD|HA)\d{3}$/.test(num)) {
+    return sendJson(res, 400, { error: "Numéro de TVA britannique invalide (9 ou 12 chiffres, ex. GB553557881)" });
+  }
+  sendJson(res, 200, {
+    valid: null,
+    countryCode: "GB",
+    vatNumber: num,
+    formatOk: true,
+    manualUrl: "https://www.tax.service.gov.uk/check-vat-number/enter-vat-details",
+    error: "Le Royaume-Uni ne fait plus partie du VIES et le service HMRC exige désormais une clé d'accès. Le format du numéro est correct — vérifiez-le en 10 secondes sur le site officiel gov.uk.",
+  });
 }
 
 /* ---------- BCE / KBO (Belgique) ---------- */
@@ -171,11 +189,18 @@ async function handleBce(res, number) {
 
 /* ---------- IBAN / BIC ---------- */
 
+// Registre IBAN officiel (SWIFT) — tous les pays participants
 const IBAN_LENGTHS = {
-  AD: 24, AT: 20, BE: 16, BG: 22, CH: 21, CY: 28, CZ: 24, DE: 22, DK: 18,
-  EE: 20, ES: 24, FI: 18, FR: 27, GB: 22, GR: 27, HR: 21, HU: 28, IE: 22,
-  IS: 26, IT: 27, LI: 21, LT: 20, LU: 20, LV: 21, MC: 27, MT: 31, NL: 18,
-  NO: 15, PL: 28, PT: 25, RO: 24, SE: 24, SI: 19, SK: 24, SM: 27,
+  AD: 24, AE: 23, AL: 28, AT: 20, AZ: 28, BA: 20, BE: 16, BG: 22, BH: 22,
+  BI: 27, BR: 29, BY: 28, CH: 21, CR: 22, CY: 28, CZ: 24, DE: 22, DJ: 27,
+  DK: 18, DO: 28, EE: 20, EG: 29, ES: 24, FI: 18, FK: 18, FO: 18, FR: 27,
+  GB: 22, GE: 22, GI: 23, GL: 18, GR: 27, GT: 28, HR: 21, HU: 28, IE: 22,
+  IL: 23, IQ: 23, IS: 26, IT: 27, JO: 30, KW: 30, KZ: 20, LB: 28, LC: 32,
+  LI: 21, LT: 20, LU: 20, LV: 21, LY: 25, MC: 27, MD: 24, ME: 22, MK: 19,
+  MN: 20, MR: 27, MT: 31, MU: 30, NI: 28, NL: 18, NO: 15, OM: 23, PK: 24,
+  PL: 28, PS: 29, PT: 25, QA: 29, RO: 24, RS: 22, RU: 33, SA: 24, SC: 31,
+  SD: 18, SE: 24, SI: 19, SK: 24, SM: 27, SO: 23, ST: 25, SV: 28, TL: 23,
+  TN: 24, TR: 26, UA: 29, VA: 22, VG: 24, XK: 20,
 };
 
 // Codes banque belges (3 premiers chiffres après BE##) -> [BIC, nom]. Table indicative des banques principales.
@@ -237,6 +262,23 @@ async function handleIban(res, rawIban) {
   if (!mod97) return sendJson(res, 200, result);
 
   result.valid = true;
+
+  // Spécifique France : clé RIB (banque 5 + guichet 5 + compte 11 + clé 2)
+  if (result.country === "FR" || result.country === "MC") {
+    const bban = iban.slice(4);
+    const toDigit = (ch) => {
+      if (/[0-9]/.test(ch)) return ch;
+      const v = ch.charCodeAt(0) - 64; // A=1 … Z=26
+      return String(v <= 9 ? v : v <= 18 ? v - 9 : v - 17); // A-I:1-9, J-R:1-9, S-Z:2-9
+    };
+    const b = Number(bban.slice(0, 5));
+    const g = Number(bban.slice(5, 10));
+    const c = Number([...bban.slice(10, 21)].map(toDigit).join(""));
+    const k = Number(bban.slice(21, 23));
+    const okRib = (89 * b + 15 * g + 3 * c + k) % 97 === 0;
+    result.checks.push({ ok: okRib, label: "Clé RIB française" });
+    result.bankCode = bban.slice(0, 5);
+  }
 
   // Spécifique Belgique : vérification du check national + banque via table
   if (result.country === "BE") {
