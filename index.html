@@ -168,6 +168,54 @@
   .tile .v { font-size: 1.25rem; font-weight: 700; }
   .tile .v.green { color: var(--ok); }
   .tile .sub { display: block; color: var(--muted); font-size: .78rem; margin-top: 3px; }
+  /* ---- page de connexion ---- */
+  .auth-wrap { display: flex; justify-content: center; padding: 34px 0 10px; }
+  .auth-card {
+    width: 100%; max-width: 410px; background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 34px 30px 26px; box-shadow: var(--shadow);
+  }
+  .auth-card .auth-logo { text-align: center; font-size: 2rem; margin-bottom: 6px; }
+  .auth-card h2 { text-align: center; font-family: ui-serif, Georgia, serif; font-size: 1.4rem; font-weight: 600; }
+  .auth-card .sub { text-align: center; color: var(--muted); font-size: .86rem; margin: 4px 0 20px; }
+  .remember { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: .86rem; color: var(--muted); cursor: pointer; }
+  .remember input { width: auto; accent-color: var(--accent); cursor: pointer; }
+  .auth-links { margin-top: 16px; text-align: center; font-size: .85rem; }
+  .switch-auth {
+    margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);
+    text-align: center; font-size: .9rem; color: var(--muted);
+  }
+
+  /* ---- tarifs deux colonnes ---- */
+  .pricing { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; align-items: stretch; }
+  @media (max-width: 640px) { .pricing { grid-template-columns: 1fr; } }
+  .price-card {
+    border: 1px solid var(--border); border-radius: 14px; padding: 26px 24px;
+    background: #101016; display: flex; flex-direction: column; position: relative;
+  }
+  .price-card .plan-name { font-weight: 700; font-size: .8rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+  .price-card .price { font-size: 2.7rem; font-weight: 800; margin: 10px 0 0; font-family: ui-serif, Georgia, serif; line-height: 1; }
+  .price-card .price small { font-size: 1.05rem; font-weight: 600; }
+  .price-card .was { color: var(--muted); font-size: .85rem; margin-top: 6px; }
+  .price-card .was s { opacity: .8; }
+  .price-card ul { list-style: none; margin: 20px 0 18px; flex: 1; }
+  .price-card li { padding: 8px 0; font-size: .9rem; display: flex; gap: 10px; align-items: flex-start; border-bottom: 1px dashed var(--border); }
+  .price-card li:last-child { border-bottom: none; }
+  .price-card .btn { margin-top: auto; }
+  .price-card.featured {
+    background: linear-gradient(165deg, #e6b75e, #c8933a);
+    color: #16100a; border-color: #edc477;
+    box-shadow: 0 6px 30px rgba(211,160,75,.28);
+  }
+  .price-card.featured .plan-name, .price-card.featured .was { color: #5f4514; }
+  .price-card.featured li { border-bottom-color: rgba(22,16,10,.22); }
+  .price-card .ribbon {
+    position: absolute; top: -13px; right: 18px; background: #16100a; color: #e7b967;
+    padding: 5px 14px; border-radius: 999px; font-size: .72rem; font-weight: 700; letter-spacing: .8px;
+    border: 1px solid var(--gold-line);
+  }
+  .price-card.featured .btn { background: #16100a; color: #e7b967; box-shadow: none; }
+  .price-card.featured .btn:hover { filter: brightness(1.35); }
+
   ul.checks { list-style: none; margin-top: 8px; }
   ul.checks li { padding: 3px 0; font-size: .88rem; }
   a { color: var(--accent); }
@@ -396,7 +444,10 @@ async function initAuth() {
     siteCfg = await (await fetch("/api/config")).json();
     await loadScript("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js");
     sb = window.supabase.createClient(siteCfg.supabaseUrl, siteCfg.supabaseAnonKey);
-    sb.auth.onAuthStateChange(() => refreshMe());
+    sb.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") { authView = "recovery"; goTab("compte"); }
+      refreshMe();
+    });
     await refreshMe();
     const p = new URLSearchParams(location.search);
     if (p.get("abonnement") === "ok") { goTab("compte"); }
@@ -450,70 +501,193 @@ function acctMsg(cls, html) {
   if (el) { el.className = "result show " + cls; el.innerHTML = html; }
 }
 
+let authView = "login"; // login | signup | forgot | recovery
+
+function switchAuth(view) { authView = view; renderAccount(); }
+
 function renderAccount() {
   const card = document.getElementById("compte-card");
   if (!card) return;
+  card.style.background = "transparent";
+  card.style.border = "none";
+  card.style.boxShadow = "none";
+  card.style.padding = "0";
+
+  /* ----- non connecté : page de connexion / inscription ----- */
   if (!me || !me.authenticated) {
-    card.innerHTML = `
-      <h2>👤 Mon compte</h2>
-      <p class="hint">Créez un compte <b>gratuit</b> : ${QUOTA_TEXTE} chaque mois.
-      Pour un usage illimité : <b>${siteCfg ? siteCfg.prices.monthly : "4,99 € / mois"}</b> ou <b>${siteCfg ? siteCfg.prices.yearly : "49 € / an"}</b> (2 mois offerts).</p>
-      <div class="row">
-        <div><label>E-mail</label><input id="acct-email" type="email" placeholder="vous@exemple.be"></div>
-        <div><label>Mot de passe (6 caractères min.)</label><input id="acct-pass" type="password" onkeydown="if(event.key==='Enter')acctLogin()"></div>
-      </div>
-      <div class="row">
-        <button class="btn" onclick="acctLogin()">Se connecter</button>
-        <button class="btn" style="background:transparent;color:var(--accent);border:2px solid var(--accent);box-shadow:none" onclick="acctSignup()">Créer mon compte gratuit</button>
-      </div>
-      <div class="result" id="acct-msg"></div>`;
+    const views = {
+      login: `
+        <div class="auth-logo">🧮</div>
+        <h2>Connexion</h2>
+        <p class="sub">Accédez à MonOutilCompta</p>
+        <label>Adresse e-mail</label>
+        <input id="acct-email" type="email" autocomplete="email" placeholder="vous@exemple.be">
+        <label>Mot de passe</label>
+        <input id="acct-pass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')acctLogin()">
+        <label class="remember"><input type="checkbox" id="acct-remember" checked> Rester connecté</label>
+        <button class="btn" onclick="acctLogin()">Connexion</button>
+        <div class="auth-links"><a href="#" onclick="switchAuth('forgot');return false">Vous ne pouvez pas accéder à votre compte ?</a></div>
+        <div class="switch-auth">Pas encore de compte ?
+          <a href="#" onclick="switchAuth('signup');return false"><b>S'inscrire gratuitement</b></a></div>`,
+      signup: `
+        <div class="auth-logo">🧮</div>
+        <h2>Inscription</h2>
+        <p class="sub">Compte gratuit : ${QUOTA_TEXTE} chaque mois</p>
+        <label>Adresse e-mail</label>
+        <input id="acct-email" type="email" autocomplete="email" placeholder="vous@exemple.be">
+        <label>Mot de passe (6 caractères min.)</label>
+        <input id="acct-pass" type="password" autocomplete="new-password">
+        <label>Confirmez le mot de passe</label>
+        <input id="acct-pass2" type="password" autocomplete="new-password" onkeydown="if(event.key==='Enter')acctSignup()">
+        <button class="btn" onclick="acctSignup()">Créer mon compte gratuit</button>
+        <div class="switch-auth">Déjà inscrit ?
+          <a href="#" onclick="switchAuth('login');return false"><b>Se connecter</b></a></div>`,
+      forgot: `
+        <div class="auth-logo">🔑</div>
+        <h2>Mot de passe oublié</h2>
+        <p class="sub">Recevez un lien de réinitialisation par e-mail</p>
+        <label>Adresse e-mail</label>
+        <input id="acct-email" type="email" autocomplete="email" placeholder="vous@exemple.be" onkeydown="if(event.key==='Enter')acctForgot()">
+        <button class="btn" onclick="acctForgot()">Envoyer le lien</button>
+        <div class="switch-auth"><a href="#" onclick="switchAuth('login');return false">← Retour à la connexion</a></div>`,
+      recovery: `
+        <div class="auth-logo">🔑</div>
+        <h2>Nouveau mot de passe</h2>
+        <p class="sub">Choisissez votre nouveau mot de passe</p>
+        <label>Nouveau mot de passe (6 caractères min.)</label>
+        <input id="acct-pass" type="password" autocomplete="new-password">
+        <label>Confirmez le mot de passe</label>
+        <input id="acct-pass2" type="password" autocomplete="new-password" onkeydown="if(event.key==='Enter')acctNewPassword()">
+        <button class="btn" onclick="acctNewPassword()">Enregistrer</button>`,
+    };
+    card.innerHTML = `<div class="auth-wrap"><div class="auth-card">
+      ${views[authView] || views.login}
+      <div class="result" id="acct-msg"></div>
+    </div></div>`;
     return;
   }
-  const q = me.quotas || {};
-  const qline = (label, o) => o ? `<span class="k">${label}</span><span class="v">${Math.max(0, o.limit - o.used)} restant(s) sur ${o.limit}</span>` : "";
-  card.innerHTML = `
-    <h2>👤 Mon compte</h2>
-    <div class="kv" style="margin-top:6px">
-      <span class="k">E-mail</span><span class="v">${esc(me.email)}</span>
-      <span class="k">Formule</span><span class="v">${me.subscribed
-        ? `⭐ Abonné ${me.plan === "yearly" ? "annuel" : "mensuel"} — illimité${me.period_end ? " jusqu'au " + new Date(me.period_end).toLocaleDateString("fr-BE") : ""}`
-        : "Gratuite (quotas mensuels)"}</span>
-      ${me.subscribed ? "" : qline("Vérifications TVA", q.vat) + qline("Validations IBAN", q.iban) + qline("Opérations PDF", q.pdf)}
-    </div>
-    ${me.subscribed ? `
-      <button class="btn" style="margin-top:18px" onclick="acctPortal()">Gérer mon abonnement (facture, annulation…)</button>
-    ` : `
-      <p class="hint" style="margin-top:18px"><b>Passez en illimité :</b></p>
-      <div class="row">
-        <button class="btn" onclick="acctSubscribe('monthly')">⭐ ${siteCfg ? siteCfg.prices.monthly : "4,99 € / mois"}</button>
-        <button class="btn" onclick="acctSubscribe('yearly')">⭐ ${siteCfg ? siteCfg.prices.yearly : "49 € / an"} <small>(2 mois offerts)</small></button>
+
+  /* ----- connecté, mot de passe en cours de réinitialisation ----- */
+  if (authView === "recovery") {
+    card.innerHTML = `<div class="auth-wrap"><div class="auth-card">
+      <div class="auth-logo">🔑</div>
+      <h2>Nouveau mot de passe</h2>
+      <label>Nouveau mot de passe (6 caractères min.)</label>
+      <input id="acct-pass" type="password" autocomplete="new-password">
+      <label>Confirmez le mot de passe</label>
+      <input id="acct-pass2" type="password" autocomplete="new-password" onkeydown="if(event.key==='Enter')acctNewPassword()">
+      <button class="btn" onclick="acctNewPassword()">Enregistrer</button>
+      <div class="result" id="acct-msg"></div>
+    </div></div>`;
+    return;
+  }
+
+  /* ----- connecté : abonné ----- */
+  if (me.subscribed) {
+    card.innerHTML = `<div class="card">
+      <h2>👤 Mon compte</h2>
+      <div class="kv" style="margin-top:6px">
+        <span class="k">E-mail</span><span class="v">${esc(me.email)}</span>
+        <span class="k">Formule</span><span class="v">⭐ Abonné ${me.plan === "yearly" ? "annuel" : "mensuel"} — illimité${me.period_end ? " jusqu'au " + new Date(me.period_end).toLocaleDateString("fr-BE") : ""}</span>
       </div>
-      ${siteCfg && !siteCfg.billingReady ? '<p class="hint" style="margin-top:8px">⚠️ Paiements en cours d\'activation — réessayez bientôt.</p>' : ""}
-    `}
-    <button class="btn" style="margin-top:10px;background:transparent;color:var(--muted);border:1px solid var(--border);box-shadow:none" onclick="acctLogout()">Se déconnecter</button>
+      <button class="btn" style="margin-top:18px" onclick="acctPortal()">Gérer mon abonnement (facture, annulation…)</button>
+      <button class="btn" style="margin-top:10px;background:transparent;color:var(--muted);border:1px solid var(--border);box-shadow:none" onclick="acctLogout()">Se déconnecter</button>
+      <div class="result" id="acct-msg"></div>
+    </div>`;
+    return;
+  }
+
+  /* ----- connecté : gratuit → tarifs en deux colonnes ----- */
+  const q = me.quotas || {};
+  const reste = o => o ? Math.max(0, o.limit - o.used) : 0;
+  const FEATURES = `
+    <li>✅ Vérifications TVA (VIES + BCE) <b>illimitées</b></li>
+    <li>✅ Validations IBAN / BIC <b>illimitées</b></li>
+    <li>✅ Outils PDF <b>illimités</b> (division, fusion, Word, OCR)</li>
+    <li>✅ Conversion Word haute fidélité</li>
+    <li>✅ Sans engagement — annulable en ligne</li>`;
+  card.innerHTML = `
+    <div class="card">
+      <h2>👤 ${esc(me.email)}</h2>
+      <p class="hint" style="margin:6px 0 0">Formule gratuite — il vous reste ce mois-ci :
+      <b>${reste(q.vat)}</b> vérification(s) TVA · <b>${reste(q.iban)}</b> IBAN · <b>${reste(q.pdf)}</b> opération(s) PDF.
+      <a href="#" onclick="acctLogout();return false" style="float:right">Se déconnecter</a></p>
+    </div>
+    <div class="pricing">
+      <div class="price-card">
+        <span class="plan-name">Mensuel</span>
+        <div class="price">4,99 €<small>/mois</small></div>
+        <div class="was">Souplesse maximale, sans engagement</div>
+        <ul>${FEATURES}</ul>
+        <button class="btn" onclick="acctSubscribe('monthly')">Choisir Mensuel →</button>
+      </div>
+      <div class="price-card featured">
+        <span class="ribbon">⭐ 2 MOIS OFFERTS</span>
+        <span class="plan-name">Annuel</span>
+        <div class="price">49 €<small>/an</small></div>
+        <div class="was"><s>59,88 €</s> — soit 4,08 €/mois</div>
+        <ul>${FEATURES}
+          <li>➕ Le meilleur prix garanti à l'année</li></ul>
+        <button class="btn" onclick="acctSubscribe('yearly')">Choisir Annuel →</button>
+      </div>
+    </div>
+    ${siteCfg && !siteCfg.billingReady ? '<p class="hint" style="margin-top:12px;text-align:center">⚠️ Paiements en cours d\'activation — réessayez bientôt.</p>' : ""}
     <div class="result" id="acct-msg"></div>`;
 }
 
 const QUOTA_TEXTE = "5 vérifications TVA, 5 validations IBAN et 2 opérations PDF offertes";
 
+function rebuildClient(storage) {
+  sb = window.supabase.createClient(siteCfg.supabaseUrl, siteCfg.supabaseAnonKey, { auth: { storage } });
+  sb.auth.onAuthStateChange((event) => {
+    if (event === "PASSWORD_RECOVERY") { authView = "recovery"; goTab("compte"); }
+    refreshMe();
+  });
+}
+
 async function acctLogin() {
+  const remember = document.getElementById("acct-remember");
+  if (remember && !remember.checked) rebuildClient(window.sessionStorage); // session close = déconnecté
   const { error } = await sb.auth.signInWithPassword({
     email: document.getElementById("acct-email").value.trim(),
     password: document.getElementById("acct-pass").value,
   });
   if (error) acctMsg("bad", "❌ " + esc(frAuthError(error.message)));
+  else authView = "login";
 }
 
 async function acctSignup() {
   const email = document.getElementById("acct-email").value.trim();
   const password = document.getElementById("acct-pass").value;
+  const password2 = (document.getElementById("acct-pass2") || {}).value;
   if (!email || !password) return acctMsg("bad", "Indiquez un e-mail et un mot de passe.");
+  if (password !== password2) return acctMsg("bad", "Les deux mots de passe ne correspondent pas.");
   const { error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin } });
   if (error) return acctMsg("bad", "❌ " + esc(frAuthError(error.message)));
   acctMsg("ok", "✅ Compte créé ! Un e-mail de confirmation vient de vous être envoyé — cliquez sur le lien, puis connectez-vous ici.");
 }
 
-async function acctLogout() { await sb.auth.signOut(); }
+async function acctForgot() {
+  const email = document.getElementById("acct-email").value.trim();
+  if (!email) return acctMsg("bad", "Indiquez votre adresse e-mail.");
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin });
+  if (error) return acctMsg("bad", "❌ " + esc(frAuthError(error.message)));
+  acctMsg("ok", "✅ E-mail envoyé ! Cliquez sur le lien reçu pour choisir un nouveau mot de passe.");
+}
+
+async function acctNewPassword() {
+  const password = document.getElementById("acct-pass").value;
+  const password2 = document.getElementById("acct-pass2").value;
+  if (password.length < 6) return acctMsg("bad", "Le mot de passe doit faire au moins 6 caractères.");
+  if (password !== password2) return acctMsg("bad", "Les deux mots de passe ne correspondent pas.");
+  const { error } = await sb.auth.updateUser({ password });
+  if (error) return acctMsg("bad", "❌ " + esc(frAuthError(error.message)));
+  authView = "login";
+  acctMsg("ok", "✅ Mot de passe mis à jour !");
+  refreshMe();
+}
+
+async function acctLogout() { authView = "login"; await sb.auth.signOut(); }
 
 async function acctSubscribe(plan) {
   acctMsg("neutral", "⏳ Préparation du paiement sécurisé…");
