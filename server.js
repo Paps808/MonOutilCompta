@@ -430,7 +430,13 @@ const server = http.createServer(async (req, res) => {
           supabaseAnonKey: billing.SUPABASE_ANON_KEY,
           prices: { monthly: billing.PRICES.monthly.label, yearly: billing.PRICES.yearly.label },
           billingReady: billing.STRIPE_READY,
+          paywall: await billing.paywallEnabled(),
         });
+      }
+      if (parts[1] === "admin" && parts[2] === "paywall" && req.method === "POST") {
+        const body = JSON.parse((await readBody(req, 10240)).toString() || "{}");
+        const r = await billing.setPaywall(req, body.enabled);
+        return sendJson(res, r.status, r.body);
       }
       if (parts[1] === "me") return sendJson(res, 200, await billing.accountStatus(req));
       if (parts[1] === "track" && req.method === "POST") {

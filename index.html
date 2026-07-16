@@ -168,6 +168,20 @@
   .tile .v { font-size: 1.25rem; font-weight: 700; }
   .tile .v.green { color: var(--ok); }
   .tile .sub { display: block; color: var(--muted); font-size: .78rem; margin-top: 3px; }
+  /* ---- interrupteur ON/OFF ---- */
+  .switch { position: relative; display: inline-block; width: 54px; height: 30px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch .slider {
+    position: absolute; inset: 0; cursor: pointer; border-radius: 999px;
+    background: #3a3a45; border: 1px solid var(--border); transition: background .18s;
+  }
+  .switch .slider::before {
+    content: ""; position: absolute; height: 22px; width: 22px; left: 3px; top: 3px;
+    border-radius: 50%; background: #cfcac0; transition: transform .18s, background .18s;
+  }
+  .switch input:checked + .slider { background: var(--ok); border-color: var(--ok); }
+  .switch input:checked + .slider::before { transform: translateX(24px); background: #fff; }
+
   /* ---- page de connexion ---- */
   .auth-wrap { display: flex; justify-content: center; padding: 34px 0 10px; }
   .auth-card {
@@ -833,11 +847,18 @@ function renderAccount() {
   if (me.is_admin) {
     card.innerHTML = `
       <div class="card">
-        <h2>📊 Tableau de bord administrateur</h2>
-        <p class="hint" style="margin:4px 0 0">Connecté en tant qu'administrateur.
-        <a href="#" onclick="acctLogout();return false" style="float:right">Se déconnecter</a></p>
+        <h2>📊 Tableau de bord administrateur
+          <a href="#" onclick="acctLogout();return false" style="float:right;font-size:.85rem;font-weight:400">Se déconnecter</a></h2>
+        <div style="display:flex;align-items:center;gap:14px;margin-top:14px;padding:14px 16px;background:#101016;border:1px solid var(--border);border-radius:10px">
+          <label class="switch">
+            <input type="checkbox" id="paywall-toggle" onchange="adminSetPaywall(this.checked)">
+            <span class="slider"></span>
+          </label>
+          <span id="paywall-label" style="font-size:.92rem">⏳ …</span>
+        </div>
       </div>
       <div id="admin-stats"><div class="card"><p class="hint">⏳ Chargement des statistiques…</p></div></div>`;
+    loadPaywallState();
     loadAdminStats();
     return;
   }
@@ -949,6 +970,39 @@ async function acctNewPassword() {
 }
 
 async function acctLogout() { authView = "login"; await sb.auth.signOut(); }
+
+function paintPaywall(enabled) {
+  const t = document.getElementById("paywall-toggle"), l = document.getElementById("paywall-label");
+  if (!t || !l) return;
+  t.checked = enabled;
+  l.innerHTML = enabled
+    ? `<b style="color:var(--ok)">Fonctions payantes ACTIVÉES</b> — compte requis, quotas gratuits, abonnements en vente`
+    : `<b style="color:var(--warn)">Fonctions payantes DÉSACTIVÉES</b> — site en accès libre total, sans inscription`;
+}
+
+async function loadPaywallState() {
+  try {
+    const cfg = await (await fetch("/api/config")).json();
+    paintPaywall(cfg.paywall !== false);
+  } catch {}
+}
+
+async function adminSetPaywall(enabled) {
+  const l = document.getElementById("paywall-label");
+  l.textContent = "⏳ Application…";
+  try {
+    const r = await authFetch("/api/admin/paywall", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Erreur");
+    paintPaywall(d.paywall_enabled);
+  } catch (e) {
+    l.textContent = "❌ " + e.message;
+    setTimeout(loadPaywallState, 1500);
+  }
+}
 
 async function loadAdminStats() {
   const el = document.getElementById("admin-stats");

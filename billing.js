@@ -63,8 +63,41 @@ async function rpc(name, token, args = {}) {
   return r.json();
 }
 
+// État du mode payant (cache 30 s pour ne pas interroger la base à chaque requête)
+let paywallCache = { value: true, ts: 0 };
+async function paywallEnabled() {
+  if (Date.now() - paywallCache.ts < 30000) return paywallCache.value;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_public_settings`, {
+      method: "POST",
+      headers: { apikey: SUPABASE_ANON_KEY, authorization: `Bearer ${SUPABASE_ANON_KEY}`, "content-type": "application/json" },
+      body: "{}",
+    });
+    if (r.ok) {
+      const j = await r.json();
+      paywallCache = { value: j.paywall_enabled !== false, ts: Date.now() };
+    }
+  } catch { /* en cas de doute on garde la dernière valeur connue */ }
+  return paywallCache.value;
+}
+
+// Bascule ON/OFF du mode payant — administrateur uniquement
+async function setPaywall(req, enabled) {
+  const token = bearerToken(req);
+  if (!token) return { status: 401, body: { error: "Connexion requise" } };
+  try {
+    const r = await rpc("set_paywall", token, { p_enabled: !!enabled });
+    if (r && r.error === "forbidden") return { status: 403, body: { error: "Réservé à l'administrateur" } };
+    paywallCache = { value: !!enabled, ts: Date.now() }; // effet immédiat sur ce serveur
+    return { status: 200, body: r };
+  } catch (e) {
+    return { status: 502, body: { error: e.message } };
+  }
+}
+
 // Vérifie l'accès à un outil : abonné = illimité, sinon quota gratuit mensuel
 async function consumeQuota(req, kind) {
+  if (!(await paywallEnabled())) return { allowed: true, paywallOff: true }; // site en accès libre
   const token = bearerToken(req);
   if (!token) return { allowed: false, reason: "auth" };
   const user = await getUser(token);
@@ -281,5 +314,5 @@ module.exports = {
   SUPABASE_URL, SUPABASE_ANON_KEY, PRICES,
   STRIPE_READY: !!STRIPE_SECRET_KEY,
   consumeQuota, accountStatus, createCheckout, createPortal, handleWebhook,
-  trackEvent, adminStats,
+  trackEvent, adminStats, paywallEnabled, setPaywall,
 };
