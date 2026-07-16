@@ -28,6 +28,13 @@ Il faut un petit serveur (inclus) car les vérifications TVA/VIES, BCE et BIC pa
 3. Dézipper, puis double-cliquer `demarrer.bat` (ou lancer `node server.js` dans le dossier).
 4. Ouvrir http://localhost:3001/
 
+**Pour la conversion PDF → Word haute fidélité** (mise en page, images, colonnes), il faut
+aussi Python sur ce PC : installer https://python.org puis exécuter une fois :
+```
+pip install pdf2docx
+```
+Sans Python, l'outil bascule automatiquement sur une conversion texte simple.
+
 ## Option 3 — Mettre en ligne (accessible partout, PC/téléphone, sans PC allumé)
 
 Hébergement gratuit possible sur **Render.com** (le plus simple) :

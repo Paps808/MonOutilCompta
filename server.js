@@ -10,6 +10,9 @@ const http = require("node:http");
 const https = require("node:https");
 const fs = require("node:fs");
 const path = require("node:path");
+const os = require("node:os");
+const crypto = require("node:crypto");
+const { execFile } = require("node:child_process");
 
 const PORT = Number(process.env.PORT) || 3001; // PORT est fourni par l'hébergeur en ligne (Render, Railway…)
 const ROOT = __dirname;
@@ -320,6 +323,66 @@ async function handleIban(res, rawIban) {
   sendJson(res, 200, result);
 }
 
+/* ---------- PDF -> Word (pdf2docx via Python, haute fidélité) ---------- */
+
+function readBody(req, maxBytes = 100 * 1024 * 1024) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on("data", (c) => {
+      size += c.length;
+      if (size > maxBytes) { req.destroy(); return reject(new Error("Fichier trop volumineux (max 100 Mo)")); }
+      chunks.push(c);
+    });
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+    req.on("error", reject);
+  });
+}
+
+async function handlePdf2Word(req, res) {
+  let pdfBuf;
+  try {
+    pdfBuf = await readBody(req);
+  } catch (e) {
+    return sendJson(res, 413, { error: e.message });
+  }
+  if (!pdfBuf || pdfBuf.length < 100 || pdfBuf.subarray(0, 5).toString() !== "%PDF-") {
+    return sendJson(res, 400, { error: "Le fichier reçu n'est pas un PDF valide." });
+  }
+  const id = crypto.randomBytes(8).toString("hex");
+  const tmpPdf = path.join(os.tmpdir(), `moc_${id}.pdf`);
+  const tmpDocx = path.join(os.tmpdir(), `moc_${id}.docx`);
+  try {
+    fs.writeFileSync(tmpPdf, pdfBuf);
+    await new Promise((resolve, reject) => {
+      execFile("python", [path.join(ROOT, "pdf2word.py"), tmpPdf, tmpDocx],
+        { timeout: 180000, windowsHide: true },
+        (err, stdout, stderr) => {
+          if (err) {
+            if (err.code === "ENOENT") return reject(new Error("PYTHON_ABSENT"));
+            return reject(new Error("Conversion échouée : " + String(stderr || err.message).slice(-300)));
+          }
+          resolve();
+        });
+    });
+    const docx = fs.readFileSync(tmpDocx);
+    res.writeHead(200, {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "Content-Length": docx.length,
+      "Cache-Control": "no-store",
+    });
+    res.end(docx);
+  } catch (e) {
+    if (e.message === "PYTHON_ABSENT") {
+      sendJson(res, 501, { error: "Python/pdf2docx indisponible sur ce serveur — conversion simplifiée utilisée à la place.", fallback: true });
+    } else {
+      sendJson(res, 500, { error: e.message });
+    }
+  } finally {
+    for (const f of [tmpPdf, tmpDocx]) { try { fs.unlinkSync(f); } catch {} }
+  }
+}
+
 /* ---------- serveur ---------- */
 
 const server = http.createServer(async (req, res) => {
@@ -332,6 +395,7 @@ const server = http.createServer(async (req, res) => {
       if (parts[1] === "vies" && parts.length === 4) return await handleVies(res, parts[2], parts[3]);
       if (parts[1] === "bce" && parts.length === 3) return await handleBce(res, parts[2]);
       if (parts[1] === "iban" && parts.length === 3) return await handleIban(res, parts[2]);
+      if (parts[1] === "pdf2word" && req.method === "POST") return await handlePdf2Word(req, res);
       return sendJson(res, 404, { error: "Route API inconnue" });
     }
     // statique

@@ -220,12 +220,21 @@
   </div>
 
   <div class="card">
-    <h2>📝 PDF → Word</h2>
-    <p class="hint">Extrait le texte du PDF et génère un document Word (.doc). La mise en page complexe
-    (colonnes, tableaux, images) est simplifiée — idéal pour récupérer et retravailler le texte.
-    Pour un PDF scanné (image), utilisez d'abord l'OCR ci-dessous.</p>
-    <label>Fichier PDF</label>
-    <input type="file" id="word-file" accept=".pdf,application/pdf">
+    <h2>📝 PDF → Word (haute fidélité)</h2>
+    <p class="hint">Conversion complète en <b>.docx</b> : mise en page, logos/images, colonnes et tableaux
+    sont reconstruits (moteur pdf2docx). Si le PDF est un <b>scan</b>, l'OCR se lance
+    <b>automatiquement</b> avant la conversion — un seul bouton pour tout.</p>
+    <div class="row">
+      <div><label>Fichier PDF</label><input type="file" id="word-file" accept=".pdf,application/pdf"></div>
+      <div><label>Langue (utile si document scanné)</label>
+        <select id="word-lang">
+          <option value="fra">Français</option>
+          <option value="nld">Néerlandais</option>
+          <option value="eng">Anglais</option>
+          <option value="deu">Allemand</option>
+          <option value="fra+eng">Français + Anglais</option>
+        </select></div>
+    </div>
     <button class="btn" onclick="uiToWord()">Convertir en Word</button>
     <div class="result" id="word-result"></div>
   </div>
@@ -660,24 +669,94 @@ async function coreExtractText(buffer) {
   return pages; // tableau de pages, chaque page = tableau de lignes
 }
 
+// OCR d'un PDF scanné -> PDF « cherchable » : on garde le PDF original (images intactes)
+// et on y dessine une couche de texte invisible aux positions reconnues par l'OCR.
+async function coreOcrSearchablePdf(buffer, lang, onProgress) {
+  await needTesseract(); await needPdfJs(); await needPdfLib();
+  const pdf = await pdfjsLib.getDocument({ data: buffer.slice(0) }).promise;
+  const worker = await Tesseract.createWorker(lang, 1);
+  const out = await PDFLib.PDFDocument.load(buffer.slice(0), { ignoreEncryption: true });
+  const font = await out.embedFont(PDFLib.StandardFonts.Helvetica);
+  for (let p = 1; p <= pdf.numPages; p++) {
+    onProgress(`OCR page ${p}/${pdf.numPages}…`);
+    const page = await pdf.getPage(p);
+    const vp = page.getViewport({ scale: 2 });
+    const canvas = document.createElement("canvas");
+    canvas.width = vp.width; canvas.height = vp.height;
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp, intent: "print" }).promise;
+    const { data } = await worker.recognize(canvas, {}, { text: true, blocks: true });
+    let words = data.words || [];
+    if (!words.length) {
+      for (const b of data.blocks || [])
+        for (const par of b.paragraphs || [])
+          for (const l of par.lines || [])
+            for (const w of l.words || []) words.push(w);
+    }
+    const target = out.getPage(p - 1);
+    const { width: pw, height: ph } = target.getSize();
+    const fx = pw / vp.width, fy = ph / vp.height;
+    for (const w of words) {
+      const t = (w.text || "").trim();
+      if (!t || !w.bbox) continue;
+      const h = (w.bbox.y1 - w.bbox.y0) * fy;
+      try {
+        target.drawText(t, {
+          x: w.bbox.x0 * fx, y: ph - w.bbox.y1 * fy,
+          size: Math.max(4, h * 0.9), font, opacity: 0,
+        });
+      } catch { /* caractère non encodable : mot ignoré dans la couche invisible */ }
+    }
+  }
+  await worker.terminate();
+  return (await out.save()).buffer;
+}
+
+// Solution de secours (serveur sans Python, ex. hébergement gratuit) : Word texte simple
+async function wordFallback(f, buf) {
+  const pages = await coreExtractText(buf.slice(0));
+  const nbLignes = pages.reduce((n, p) => n + p.length, 0);
+  if (nbLignes === 0) throw new Error("Aucun texte extractible.");
+  const body = pages.map(lignes => lignes.map(l => `<p>${esc(l)}</p>`).join("\n"))
+    .join('\n<br clear="all" style="page-break-before:always">\n');
+  const doc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">
+<head><meta charset="utf-8"><style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt}p{margin:0 0 6pt}</style></head>
+<body>${body}</body></html>`;
+  download(new TextEncoder().encode(doc), `${baseName(f)}.doc`, "application/msword");
+  return nbLignes;
+}
+
 async function uiToWord() {
   const f = document.getElementById("word-file").files[0];
   if (!f) return show("word-result", "bad", "Choisissez un fichier PDF.");
-  show("word-result", "neutral", "⏳ Extraction du texte…");
+  const prog = m => show("word-result", "neutral", "⏳ " + esc(m));
   try {
-    const pages = await coreExtractText(await f.arrayBuffer());
+    prog("Analyse du document…");
+    let buf = await f.arrayBuffer();
+    // Détection scan : aucune ligne de texte extractible ?
+    const pages = await coreExtractText(buf.slice(0));
     const nbLignes = pages.reduce((n, p) => n + p.length, 0);
+    let ocrFait = false;
     if (nbLignes === 0) {
-      return show("word-result", "warn", "⚠️ Aucun texte détecté : ce PDF est probablement un scan (image). Utilisez l'outil OCR ci-dessous, puis copiez le texte dans Word.");
+      const lang = document.getElementById("word-lang").value;
+      prog("PDF scanné détecté — lancement automatique de l'OCR (première fois : téléchargement ~15 Mo)…");
+      buf = await coreOcrSearchablePdf(buf, lang, prog);
+      ocrFait = true;
     }
-    const body = pages.map(lignes => lignes.map(l => `<p>${esc(l)}</p>`).join("\n"))
-      .join('\n<br clear="all" style="page-break-before:always">\n');
-    const doc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">
-<head><meta charset="utf-8"><!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml><![endif]-->
-<style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt}p{margin:0 0 6pt}</style></head>
-<body>${body}</body></html>`;
-    download(new TextEncoder().encode(doc), `${baseName(f)}.doc`, "application/msword");
-    show("word-result", "ok", `✅ <b>${baseName(f)}.doc</b> téléchargé (${pages.length} page(s), ${nbLignes} lignes de texte). Word l'ouvre directement ; enregistrez-le ensuite en .docx si besoin.`);
+    prog("Conversion Word haute fidélité en cours…");
+    const resp = await fetch("/api/pdf2word", { method: "POST", body: buf });
+    if (resp.ok) {
+      const docx = await resp.arrayBuffer();
+      download(docx, `${baseName(f)}.docx`, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+      show("word-result", "ok", `✅ <b>${baseName(f)}.docx</b> téléchargé — mise en page, images et tableaux reconstruits.${ocrFait ? "<br>🔎 Le document était un scan : l'OCR a été appliqué automatiquement avant conversion." : ""}`);
+    } else {
+      const err = await resp.json().catch(() => ({}));
+      if (err.fallback) {
+        const n = await wordFallback(f, buf);
+        show("word-result", "warn", `⚠️ ${esc(err.error)}<br>✅ <b>${baseName(f)}.doc</b> téléchargé (texte uniquement, ${n} lignes).`);
+      } else {
+        show("word-result", "bad", "❌ " + esc(err.error || `Erreur serveur (${resp.status})`));
+      }
+    }
   } catch (e) { show("word-result", "bad", "❌ " + esc(e.message)); }
 }
 
@@ -702,7 +781,7 @@ async function uiOcr() {
         const vp = page.getViewport({ scale: 2 });
         const canvas = document.createElement("canvas");
         canvas.width = vp.width; canvas.height = vp.height;
-        await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
+        await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp, intent: "print" }).promise;
         const { data } = await worker.recognize(canvas);
         texte += (pdf.numPages > 1 ? `\n===== Page ${p} =====\n` : "") + data.text.trim() + "\n";
       }
