@@ -100,7 +100,7 @@
 
 <header>
   <h1>🧮 MonOutilCompta <span style="opacity:.7;font-weight:400">— MOC</span></h1>
-  <p>Prorata · Vérification TVA (VIES / BCE) · Validation IBAN &amp; BIC</p>
+  <p>Prorata · Vérification TVA (VIES / BCE) · Validation IBAN &amp; BIC · Outils PDF</p>
   <span id="status"><span class="dot"></span><span id="statusTxt">Connexion au serveur…</span></span>
 </header>
 
@@ -108,6 +108,7 @@
   <button class="active" data-tab="prorata">📐 Prorata</button>
   <button data-tab="tva">🏢 Vérification TVA</button>
   <button data-tab="iban">🏦 IBAN / BIC</button>
+  <button data-tab="pdf">📄 PDF</button>
 </nav>
 
 <main>
@@ -185,6 +186,69 @@
     <button class="btn" id="iban-btn" onclick="checkIban()">Valider</button>
     <div class="result" id="iban-result"></div>
   </div>
+</section>
+
+<!-- ============ PDF ============ -->
+<section id="tab-pdf">
+
+  <div class="card">
+    <h2>✂️ Diviser un PDF (Split)</h2>
+    <p class="hint">Extraire certaines pages, ou découper le document en un fichier par page.
+    <b>Confidentialité :</b> tout se fait dans votre navigateur, le fichier n'est envoyé nulle part.</p>
+    <label>Fichier PDF</label>
+    <input type="file" id="split-file" accept=".pdf,application/pdf">
+    <div class="row">
+      <div><label>Pages à extraire (ex. 1-3,5,8-10 — vide = toutes)</label><input id="split-ranges" placeholder="1-3,5"></div>
+      <div><label>Mode</label>
+        <select id="split-mode">
+          <option value="one">Un seul PDF avec les pages choisies</option>
+          <option value="each">Un fichier par page</option>
+        </select></div>
+    </div>
+    <button class="btn" onclick="uiSplit()">Diviser</button>
+    <div class="result" id="split-result"></div>
+  </div>
+
+  <div class="card">
+    <h2>🧷 Fusionner des PDF (Fuse)</h2>
+    <p class="hint">Combiner plusieurs PDF en un seul, dans l'ordre de votre choix.</p>
+    <label>Fichiers PDF (sélection multiple)</label>
+    <input type="file" id="merge-files" accept=".pdf,application/pdf" multiple onchange="mergeListRefresh()">
+    <div id="merge-list" style="margin-top:10px"></div>
+    <button class="btn" onclick="uiMerge()">Fusionner</button>
+    <div class="result" id="merge-result"></div>
+  </div>
+
+  <div class="card">
+    <h2>📝 PDF → Word</h2>
+    <p class="hint">Extrait le texte du PDF et génère un document Word (.doc). La mise en page complexe
+    (colonnes, tableaux, images) est simplifiée — idéal pour récupérer et retravailler le texte.
+    Pour un PDF scanné (image), utilisez d'abord l'OCR ci-dessous.</p>
+    <label>Fichier PDF</label>
+    <input type="file" id="word-file" accept=".pdf,application/pdf">
+    <button class="btn" onclick="uiToWord()">Convertir en Word</button>
+    <div class="result" id="word-result"></div>
+  </div>
+
+  <div class="card">
+    <h2>🔎 OCR — reconnaissance de texte (PDF scanné ou image)</h2>
+    <p class="hint">Reconnaît le texte d'un PDF scanné ou d'une image (JPG, PNG). Le premier lancement
+    télécharge le moteur (~15 Mo), ensuite c'est instantané. Tout reste dans votre navigateur.</p>
+    <div class="row">
+      <div><label>Fichier PDF ou image</label><input type="file" id="ocr-file" accept=".pdf,image/*"></div>
+      <div><label>Langue du document</label>
+        <select id="ocr-lang">
+          <option value="fra">Français</option>
+          <option value="nld">Néerlandais</option>
+          <option value="eng">Anglais</option>
+          <option value="deu">Allemand</option>
+          <option value="fra+eng">Français + Anglais</option>
+        </select></div>
+    </div>
+    <button class="btn" onclick="uiOcr()">Lancer l'OCR</button>
+    <div class="result" id="ocr-result"></div>
+  </div>
+
 </section>
 
 </main>
@@ -441,6 +505,221 @@ async function checkIban() {
   } finally {
     btn.disabled = false; btn.textContent = "Valider";
   }
+}
+
+/* ---------- Outils PDF (100 % dans le navigateur) ---------- */
+function loadScript(src) {
+  return new Promise((ok, ko) => {
+    if (document.querySelector(`script[data-src="${src}"]`)) return ok();
+    const s = document.createElement("script");
+    s.src = src; s.dataset.src = src;
+    s.onload = ok;
+    s.onerror = () => ko(new Error("Impossible de charger la bibliothèque (connexion internet requise) : " + src));
+    document.head.appendChild(s);
+  });
+}
+const needPdfLib = () => loadScript("https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js");
+async function needPdfJs() {
+  await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js");
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+}
+const needTesseract = () => loadScript("https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js");
+
+function download(bytes, name, type) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([bytes], { type }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+const baseName = f => f.name.replace(/\.pdf$/i, "");
+
+// "1-3,5,8-10" -> [0,1,2,4,7,8,9] (indices), bornés à total
+function parseRanges(str, total) {
+  if (!str.trim()) return Array.from({ length: total }, (_, i) => i);
+  const out = new Set();
+  for (const seg of str.split(",")) {
+    const m = seg.trim().match(/^(\d+)\s*(?:-\s*(\d+))?$/);
+    if (!m) throw new Error(`Plage invalide : « ${seg.trim()} »`);
+    const a = Number(m[1]), b = m[2] ? Number(m[2]) : a;
+    if (a < 1 || b > total || a > b) throw new Error(`Plage hors limites : « ${seg.trim()} » (document de ${total} pages)`);
+    for (let i = a; i <= b; i++) out.add(i - 1);
+  }
+  return [...out].sort((x, y) => x - y);
+}
+
+async function coreSplit(buffer, rangeStr) {
+  await needPdfLib();
+  const src = await PDFLib.PDFDocument.load(buffer, { ignoreEncryption: true });
+  const idx = parseRanges(rangeStr, src.getPageCount());
+  const doc = await PDFLib.PDFDocument.create();
+  const pages = await doc.copyPages(src, idx);
+  pages.forEach(p => doc.addPage(p));
+  return { bytes: await doc.save(), pages: idx.length, total: src.getPageCount() };
+}
+
+async function coreSplitEach(buffer, rangeStr) {
+  await needPdfLib();
+  const src = await PDFLib.PDFDocument.load(buffer, { ignoreEncryption: true });
+  const idx = parseRanges(rangeStr, src.getPageCount());
+  const files = [];
+  for (const i of idx) {
+    const doc = await PDFLib.PDFDocument.create();
+    const [p] = await doc.copyPages(src, [i]);
+    doc.addPage(p);
+    files.push({ page: i + 1, bytes: await doc.save() });
+  }
+  return files;
+}
+
+async function uiSplit() {
+  const f = document.getElementById("split-file").files[0];
+  if (!f) return show("split-result", "bad", "Choisissez un fichier PDF.");
+  show("split-result", "neutral", "⏳ Traitement en cours…");
+  try {
+    const buf = await f.arrayBuffer();
+    const ranges = document.getElementById("split-ranges").value;
+    if (document.getElementById("split-mode").value === "one") {
+      const r = await coreSplit(buf, ranges);
+      download(r.bytes, `${baseName(f)}_extrait.pdf`, "application/pdf");
+      show("split-result", "ok", `✅ <b>${r.pages} page(s)</b> extraite(s) sur ${r.total} — le fichier <b>${esc(baseName(f))}_extrait.pdf</b> a été téléchargé.`);
+    } else {
+      const files = await coreSplitEach(buf, ranges);
+      for (const x of files) {
+        download(x.bytes, `${baseName(f)}_page_${x.page}.pdf`, "application/pdf");
+        await new Promise(r => setTimeout(r, 350)); // laisse le navigateur enchaîner les téléchargements
+      }
+      show("split-result", "ok", `✅ <b>${files.length} fichier(s)</b> téléchargé(s) (un par page). Si le navigateur demande l'autorisation de « télécharger plusieurs fichiers », acceptez.`);
+    }
+  } catch (e) { show("split-result", "bad", "❌ " + esc(e.message)); }
+}
+
+let mergeOrder = [];
+function mergeListRefresh() {
+  mergeOrder = [...document.getElementById("merge-files").files];
+  mergeListRender();
+}
+function mergeListRender() {
+  document.getElementById("merge-list").innerHTML = mergeOrder.map((f, i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;margin-top:6px;background:#fbfcff">
+      <span style="flex:1;font-size:.9rem">${i + 1}. ${esc(f.name)} <span style="color:var(--muted)">(${(f.size / 1024).toFixed(0)} Ko)</span></span>
+      <button class="copy" onclick="mergeMove(${i},-1)" ${i === 0 ? "disabled" : ""}>↑</button>
+      <button class="copy" onclick="mergeMove(${i},1)" ${i === mergeOrder.length - 1 ? "disabled" : ""}>↓</button>
+    </div>`).join("");
+}
+function mergeMove(i, d) {
+  const t = mergeOrder[i]; mergeOrder[i] = mergeOrder[i + d]; mergeOrder[i + d] = t;
+  mergeListRender();
+}
+
+async function coreMerge(buffers) {
+  await needPdfLib();
+  const doc = await PDFLib.PDFDocument.create();
+  let pages = 0;
+  for (const buf of buffers) {
+    const src = await PDFLib.PDFDocument.load(buf, { ignoreEncryption: true });
+    const copied = await doc.copyPages(src, src.getPageIndices());
+    copied.forEach(p => doc.addPage(p));
+    pages += copied.length;
+  }
+  return { bytes: await doc.save(), pages };
+}
+
+async function uiMerge() {
+  if (mergeOrder.length < 2) return show("merge-result", "bad", "Sélectionnez au moins deux fichiers PDF.");
+  show("merge-result", "neutral", "⏳ Fusion en cours…");
+  try {
+    const buffers = [];
+    for (const f of mergeOrder) buffers.push(await f.arrayBuffer());
+    const r = await coreMerge(buffers);
+    download(r.bytes, "fusion.pdf", "application/pdf");
+    show("merge-result", "ok", `✅ <b>${mergeOrder.length} fichiers</b> fusionnés (${r.pages} pages au total) — <b>fusion.pdf</b> téléchargé.`);
+  } catch (e) { show("merge-result", "bad", "❌ " + esc(e.message)); }
+}
+
+// Extraction du texte page par page (regroupe les lignes par position verticale)
+async function coreExtractText(buffer) {
+  await needPdfJs();
+  const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+  const pages = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const tc = await (await pdf.getPage(p)).getTextContent();
+    const lines = new Map();
+    for (const it of tc.items) {
+      if (!it.str) continue;
+      const y = Math.round(it.transform[5]);
+      const key = [...lines.keys()].find(k => Math.abs(k - y) <= 2);
+      if (key !== undefined) lines.get(key).push(it);
+      else lines.set(y, [it]);
+    }
+    const ordered = [...lines.entries()].sort((a, b) => b[0] - a[0])
+      .map(([, items]) => items.sort((a, b) => a.transform[4] - b.transform[4]).map(i => i.str).join(" ").replace(/\s+/g, " ").trim())
+      .filter(Boolean);
+    pages.push(ordered);
+  }
+  return pages; // tableau de pages, chaque page = tableau de lignes
+}
+
+async function uiToWord() {
+  const f = document.getElementById("word-file").files[0];
+  if (!f) return show("word-result", "bad", "Choisissez un fichier PDF.");
+  show("word-result", "neutral", "⏳ Extraction du texte…");
+  try {
+    const pages = await coreExtractText(await f.arrayBuffer());
+    const nbLignes = pages.reduce((n, p) => n + p.length, 0);
+    if (nbLignes === 0) {
+      return show("word-result", "warn", "⚠️ Aucun texte détecté : ce PDF est probablement un scan (image). Utilisez l'outil OCR ci-dessous, puis copiez le texte dans Word.");
+    }
+    const body = pages.map(lignes => lignes.map(l => `<p>${esc(l)}</p>`).join("\n"))
+      .join('\n<br clear="all" style="page-break-before:always">\n');
+    const doc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">
+<head><meta charset="utf-8"><!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml><![endif]-->
+<style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt}p{margin:0 0 6pt}</style></head>
+<body>${body}</body></html>`;
+    download(new TextEncoder().encode(doc), `${baseName(f)}.doc`, "application/msword");
+    show("word-result", "ok", `✅ <b>${baseName(f)}.doc</b> téléchargé (${pages.length} page(s), ${nbLignes} lignes de texte). Word l'ouvre directement ; enregistrez-le ensuite en .docx si besoin.`);
+  } catch (e) { show("word-result", "bad", "❌ " + esc(e.message)); }
+}
+
+async function uiOcr() {
+  const f = document.getElementById("ocr-file").files[0];
+  if (!f) return show("ocr-result", "bad", "Choisissez un PDF ou une image.");
+  const lang = document.getElementById("ocr-lang").value;
+  const prog = m => show("ocr-result", "neutral", "⏳ " + esc(m));
+  try {
+    prog("Chargement du moteur OCR (première fois : ~15 Mo)…");
+    await needTesseract();
+    const worker = await Tesseract.createWorker(lang, 1, {
+      logger: m => { if (m.status === "recognizing text") prog(`Reconnaissance… ${Math.round(m.progress * 100)} %`); }
+    });
+    let texte = "";
+    if (f.type === "application/pdf" || /\.pdf$/i.test(f.name)) {
+      await needPdfJs();
+      const pdf = await pdfjsLib.getDocument({ data: await f.arrayBuffer() }).promise;
+      for (let p = 1; p <= pdf.numPages; p++) {
+        prog(`Page ${p}/${pdf.numPages} : préparation de l'image…`);
+        const page = await pdf.getPage(p);
+        const vp = page.getViewport({ scale: 2 });
+        const canvas = document.createElement("canvas");
+        canvas.width = vp.width; canvas.height = vp.height;
+        await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
+        const { data } = await worker.recognize(canvas);
+        texte += (pdf.numPages > 1 ? `\n===== Page ${p} =====\n` : "") + data.text.trim() + "\n";
+      }
+    } else {
+      const { data } = await worker.recognize(f);
+      texte = data.text;
+    }
+    await worker.terminate();
+    texte = texte.trim();
+    if (!texte) return show("ocr-result", "warn", "⚠️ Aucun texte reconnu. Essayez une autre langue ou une meilleure qualité de scan.");
+    window._ocrTexte = texte;
+    show("ocr-result", "ok", `
+      <h3><span class="badge ok">✓ ${texte.length.toLocaleString("fr-BE")} caractères reconnus</span>
+      <button class="copy" onclick="navigator.clipboard.writeText(window._ocrTexte)">copier tout</button>
+      <button class="copy" onclick="download(new TextEncoder().encode(window._ocrTexte),'ocr.txt','text/plain')">télécharger .txt</button></h3>
+      <textarea style="width:100%;height:220px;margin-top:10px;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:.9rem">${esc(texte)}</textarea>`);
+  } catch (e) { show("ocr-result", "bad", "❌ " + esc(e.message)); }
 }
 </script>
 </body>
