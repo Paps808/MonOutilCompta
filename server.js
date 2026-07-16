@@ -12,7 +12,10 @@ const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
 const crypto = require("node:crypto");
+const zlib = require("node:zlib");
 const { execFile } = require("node:child_process");
+
+const PYTHON = process.platform === "win32" ? "python" : "python3";
 
 const PORT = Number(process.env.PORT) || 3001; // PORT est fourni par l'hébergeur en ligne (Render, Railway…)
 const ROOT = __dirname;
@@ -64,13 +67,23 @@ function fetchText(url, { timeout = 10000 } = {}) {
   });
 }
 
+function sendCompressed(res, status, headers, body) {
+  const buf = Buffer.isBuffer(body) ? body : Buffer.from(body);
+  if (res.acceptsGzip && buf.length > 512) {
+    const gz = zlib.gzipSync(buf);
+    res.writeHead(status, { ...headers, "Content-Encoding": "gzip", "Content-Length": gz.length });
+    res.end(gz);
+  } else {
+    res.writeHead(status, { ...headers, "Content-Length": buf.length });
+    res.end(buf);
+  }
+}
+
 function sendJson(res, status, obj) {
-  const body = JSON.stringify(obj);
-  res.writeHead(status, {
+  sendCompressed(res, status, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
-  });
-  res.end(body);
+  }, JSON.stringify(obj));
 }
 
 /* ---------- TVA / VIES ---------- */
@@ -355,7 +368,7 @@ async function handlePdf2Word(req, res) {
   try {
     fs.writeFileSync(tmpPdf, pdfBuf);
     await new Promise((resolve, reject) => {
-      execFile("python", [path.join(ROOT, "pdf2word.py"), tmpPdf, tmpDocx],
+      execFile(PYTHON, [path.join(ROOT, "pdf2word.py"), tmpPdf, tmpDocx],
         { timeout: 180000, windowsHide: true },
         (err, stdout, stderr) => {
           if (err) {
@@ -388,6 +401,7 @@ async function handlePdf2Word(req, res) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const parts = url.pathname.split("/").filter(Boolean);
+  res.acceptsGzip = /\bgzip\b/.test(req.headers["accept-encoding"] || "");
 
   try {
     if (parts[0] === "api") {
@@ -407,8 +421,10 @@ const server = http.createServer(async (req, res) => {
     }
     const ext = path.extname(filePath).toLowerCase();
     const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".ico": "image/x-icon" };
-    res.writeHead(200, { "Content-Type": (types[ext] || "application/octet-stream") + "; charset=utf-8" });
-    fs.createReadStream(filePath).pipe(res);
+    sendCompressed(res, 200, {
+      "Content-Type": (types[ext] || "application/octet-stream") + "; charset=utf-8",
+      "Cache-Control": "no-cache",
+    }, fs.readFileSync(filePath));
   } catch (e) {
     sendJson(res, 500, { error: "Erreur serveur : " + e.message });
   }

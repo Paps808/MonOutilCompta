@@ -1,7 +1,6 @@
 services:
   - type: web
     name: monoutilcompta
-    runtime: node
+    runtime: docker
     plan: free
-    buildCommand: ""
-    startCommand: node server.js
+    healthCheckPath: /api/health
