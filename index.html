@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MonOutilCompta — MOC</title>
+<style>
+  :root {
+    --bg: #f4f6fb; --card: #ffffff; --ink: #1e2433; --muted: #67718a;
+    --accent: #2456e6; --accent-soft: #e8eeff; --ok: #0f9d58; --ok-soft: #e6f6ec;
+    --bad: #d93025; --bad-soft: #fdecea; --warn: #b06000; --warn-soft: #fff4e0;
+    --border: #dde3f0; --radius: 14px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--ink); min-height: 100vh;
+  }
+  header {
+    background: linear-gradient(120deg, #1b2a5e, #2456e6);
+    color: #fff; padding: 26px 20px 20px; text-align: center;
+  }
+  header h1 { font-size: 1.5rem; font-weight: 650; letter-spacing: .2px; }
+  header p { opacity: .85; font-size: .9rem; margin-top: 5px; }
+  #status { display: inline-flex; align-items: center; gap: 7px; margin-top: 10px;
+    background: rgba(255,255,255,.14); padding: 4px 14px; border-radius: 999px; font-size: .8rem; }
+  #status .dot { width: 9px; height: 9px; border-radius: 50%; background: #ffb300; }
+  #status.on .dot { background: #3ddc84; box-shadow: 0 0 6px #3ddc84; }
+  #status.off .dot { background: #ff5252; }
+
+  nav { display: flex; justify-content: center; gap: 8px; padding: 16px 12px 0; flex-wrap: wrap; }
+  nav button {
+    border: 1px solid var(--border); background: var(--card); color: var(--ink);
+    padding: 10px 22px; border-radius: 999px; font-size: .95rem; cursor: pointer;
+    font-weight: 550; transition: all .15s;
+  }
+  nav button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  nav button:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+
+  main { max-width: 860px; margin: 0 auto; padding: 18px 16px 60px; }
+  section { display: none; }
+  section.active { display: block; animation: fade .18s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 22px; margin-top: 16px; box-shadow: 0 1px 4px rgba(20,30,70,.05);
+  }
+  .card h2 { font-size: 1.05rem; margin-bottom: 4px; }
+  .card .hint { color: var(--muted); font-size: .85rem; margin-bottom: 14px; }
+
+  label { display: block; font-size: .82rem; font-weight: 600; color: var(--muted); margin: 10px 0 4px; }
+  input, select {
+    width: 100%; padding: 11px 13px; border: 1px solid var(--border); border-radius: 9px;
+    font-size: 1rem; background: #fbfcff; color: var(--ink);
+  }
+  input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  @media (max-width: 640px) { .row, .row3 { grid-template-columns: 1fr; } }
+
+  .btn {
+    margin-top: 16px; background: var(--accent); color: #fff; border: none; cursor: pointer;
+    padding: 12px 26px; border-radius: 9px; font-size: 1rem; font-weight: 600; width: 100%;
+  }
+  .btn:hover { filter: brightness(1.08); }
+  .btn:disabled { opacity: .6; cursor: wait; }
+
+  .result { margin-top: 16px; border-radius: 10px; padding: 16px; display: none; font-size: .95rem; }
+  .result.show { display: block; }
+  .result.ok { background: var(--ok-soft); border: 1px solid #bfe5cd; }
+  .result.bad { background: var(--bad-soft); border: 1px solid #f2c4c0; }
+  .result.warn { background: var(--warn-soft); border: 1px solid #ecd9b0; }
+  .result.neutral { background: var(--accent-soft); border: 1px solid #c9d7fb; }
+  .result h3 { font-size: 1rem; margin-bottom: 8px; }
+  .kv { display: grid; grid-template-columns: 190px 1fr; gap: 4px 12px; margin-top: 8px; }
+  .kv .k { color: var(--muted); font-size: .84rem; }
+  .kv .v { font-weight: 550; word-break: break-word; }
+  @media (max-width: 640px) { .kv { grid-template-columns: 1fr; } .kv .k { margin-top: 6px; } }
+  .big { font-size: 1.7rem; font-weight: 700; margin: 6px 0; }
+  .badge { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: .8rem; font-weight: 700; }
+  .badge.ok { background: var(--ok); color: #fff; }
+  .badge.bad { background: var(--bad); color: #fff; }
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 12px; }
+  @media (max-width: 640px) { .tiles { grid-template-columns: 1fr; } }
+  .tile { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .tile .k { display: block; color: var(--muted); font-size: .75rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+  .tile .v { font-size: 1.25rem; font-weight: 700; }
+  .tile .v.green { color: var(--ok); }
+  .tile .sub { display: block; color: var(--muted); font-size: .78rem; margin-top: 3px; }
+  ul.checks { list-style: none; margin-top: 8px; }
+  ul.checks li { padding: 3px 0; font-size: .88rem; }
+  a { color: var(--accent); }
+  .copy { border: 1px solid var(--border); background: #fff; border-radius: 7px; padding: 4px 10px;
+    cursor: pointer; font-size: .78rem; margin-left: 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🧮 MonOutilCompta <span style="opacity:.7;font-weight:400">— MOC</span></h1>
+  <p>Prorata · Vérification TVA (VIES / BCE) · Validation IBAN &amp; BIC</p>
+  <span id="status"><span class="dot"></span><span id="statusTxt">Connexion au serveur…</span></span>
+</header>
+
+<nav>
+  <button class="active" data-tab="prorata">📐 Prorata</button>
+  <button data-tab="tva">🏢 Vérification TVA</button>
+  <button data-tab="iban">🏦 IBAN / BIC</button>
+</nav>
+
+<main>
+
+<!-- ============ PRORATA ============ -->
+<section id="tab-prorata" class="active">
+
+  <div class="card">
+    <h2>Calcul de prorata</h2>
+    <p class="hint">Période et montant total → nombre de jours, prix par jour et répartition par année civile.</p>
+    <div class="row">
+      <div><label>Date de début</label><input type="date" id="pt-debut"></div>
+      <div><label>Date de fin</label><input type="date" id="pt-fin"></div>
+    </div>
+    <label>Montant total (€)</label>
+    <input type="number" id="pt-montant" step="0.01" placeholder="3322">
+    <button class="btn" onclick="calcTemporis()">🧮 Calculer</button>
+    <div class="result" id="pt-result"></div>
+  </div>
+
+  <div class="card">
+    <h2>Règle de trois (prorata simple)</h2>
+    <p class="hint">Répartir un montant proportionnellement : X représente quelle part de Y appliquée à Z ?</p>
+    <div class="row3">
+      <div><label>Part (ex. 40 m², 3 personnes…)</label><input type="number" id="r3-part" step="any" placeholder="40"></div>
+      <div><label>Total (ex. 100 m², 5 personnes…)</label><input type="number" id="r3-total" step="any" placeholder="100"></div>
+      <div><label>Montant à répartir (€)</label><input type="number" id="r3-montant" step="0.01" placeholder="1500"></div>
+    </div>
+    <button class="btn" onclick="calcRegleDeTrois()">Calculer</button>
+    <div class="result neutral" id="r3-result"></div>
+  </div>
+
+  <div class="card">
+    <h2>Prorata général de déduction TVA (assujetti mixte)</h2>
+    <p class="hint">CA avec droit à déduction ÷ CA total — arrondi à l'unité <b>supérieure</b> (art. 46 §1 CTVA belge).</p>
+    <div class="row">
+      <div><label>Chiffre d'affaires avec droit à déduction (€)</label><input type="number" id="pv-ded" step="0.01" placeholder="250000"></div>
+      <div><label>Chiffre d'affaires total (€)</label><input type="number" id="pv-total" step="0.01" placeholder="400000"></div>
+    </div>
+    <div class="row">
+      <div><label>TVA en amont à répartir (€) — optionnel</label><input type="number" id="pv-tva" step="0.01" placeholder="21000"></div>
+    </div>
+    <button class="btn" onclick="calcProrataTva()">Calculer</button>
+    <div class="result neutral" id="pv-result"></div>
+  </div>
+
+</section>
+
+<!-- ============ TVA ============ -->
+<section id="tab-tva">
+  <div class="card">
+    <h2>Vérification d'un numéro de TVA européen (VIES)</h2>
+    <p class="hint">Saisissez le numéro avec le code pays, ex. <b>BE0403199702</b>, <b>FR40303265045</b>, <b>NL810433941B01</b>. La consultation VIES est officielle (Commission européenne). Pour les numéros belges, les informations publiques BCE sont récupérées en plus.</p>
+    <label>Numéro de TVA</label>
+    <input id="tva-num" placeholder="BE0403199702" onkeydown="if(event.key==='Enter')checkTva()">
+    <button class="btn" id="tva-btn" onclick="checkTva()">Vérifier</button>
+    <div class="result" id="tva-result"></div>
+    <div class="result" id="bce-result"></div>
+  </div>
+</section>
+
+<!-- ============ IBAN ============ -->
+<section id="tab-iban">
+  <div class="card">
+    <h2>Validation IBAN &amp; identification de la banque (BIC)</h2>
+    <p class="hint">Le numéro est validé mathématiquement (clé modulo 97, longueur, clé nationale belge). Le BIC et le nom de la banque sont recherchés automatiquement (BE, DE, NL, LU, AT, LI).</p>
+    <label>IBAN</label>
+    <input id="iban-num" placeholder="BE68 5390 0754 7034" onkeydown="if(event.key==='Enter')checkIban()">
+    <button class="btn" id="iban-btn" onclick="checkIban()">Valider</button>
+    <div class="result" id="iban-result"></div>
+  </div>
+</section>
+
+</main>
+
+<script>
+/* ---------- navigation ---------- */
+document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll("nav button").forEach(x => x.classList.remove("active"));
+  document.querySelectorAll("section").forEach(x => x.classList.remove("active"));
+  b.classList.add("active");
+  document.getElementById("tab-" + b.dataset.tab).classList.add("active");
+}));
+
+/* ---------- état serveur ---------- */
+async function ping() {
+  const el = document.getElementById("status"), txt = document.getElementById("statusTxt");
+  try {
+    const r = await fetch("/api/health");
+    if (r.ok) { el.className = "on"; txt.textContent = "Serveur connecté"; return; }
+    throw 0;
+  } catch { el.className = "off"; txt.textContent = "Serveur injoignable"; }
+}
+ping(); setInterval(ping, 15000);
+
+const fmtEur = n => n.toLocaleString("fr-BE", { style: "currency", currency: "EUR" });
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function show(id, cls, html) {
+  const el = document.getElementById(id);
+  el.className = "result show " + cls;
+  el.innerHTML = html;
+}
+function hide(id) { document.getElementById(id).className = "result"; }
+
+/* ---------- calcul de prorata (répartition par année civile) ---------- */
+function calcTemporis() {
+  const montant = parseFloat(document.getElementById("pt-montant").value);
+  const d1 = document.getElementById("pt-debut").value, d2 = document.getElementById("pt-fin").value;
+  if (!d1 || !d2 || !(montant > 0)) return show("pt-result", "bad", "Complétez les deux dates et le montant total.");
+  const debut = new Date(d1 + "T00:00:00"), fin = new Date(d2 + "T00:00:00");
+  if (fin < debut) return show("pt-result", "bad", "La date de fin est antérieure à la date de début.");
+
+  const totalJours = Math.round((fin - debut) / 86400000) + 1; // dates de début et fin incluses
+  const prixJour = montant / totalJours;
+
+  // jours par année civile
+  const annees = [];
+  for (let y = debut.getFullYear(); y <= fin.getFullYear(); y++) {
+    const de = y === debut.getFullYear() ? debut : new Date(y, 0, 1);
+    const a = y === fin.getFullYear() ? fin : new Date(y, 11, 31);
+    annees.push({ annee: y, jours: Math.round((a - de) / 86400000) + 1 });
+  }
+  // montants exacts au prorata des jours ; la dernière année absorbe l'arrondi pour que la somme = montant total
+  let cumul = 0;
+  annees.forEach((a, i) => {
+    a.montant = i === annees.length - 1
+      ? Math.round((montant - cumul) * 100) / 100
+      : Math.round(montant * a.jours / totalJours * 100) / 100;
+    cumul += a.montant;
+  });
+
+  show("pt-result", "ok", `
+    <h3><span class="badge ok">✓ Calcul effectué</span></h3>
+    <div class="tiles">
+      <div class="tile"><span class="k">Nombre de jours</span><span class="v">${totalJours} jours</span></div>
+      <div class="tile"><span class="k">Prix par jour</span><span class="v">${prixJour.toFixed(2)} €</span></div>
+      ${annees.map(a => `<div class="tile"><span class="k">Montant ${a.annee}</span><span class="v green">${a.montant.toFixed(2)} €</span><span class="sub">${a.jours} jours</span></div>`).join("")}
+    </div>
+    <p style="margin-top:10px;font-size:.8rem;color:var(--muted)">Du ${debut.toLocaleDateString("fr-BE")} au ${fin.toLocaleDateString("fr-BE")} inclus — ${fmtEur(montant)} ÷ ${totalJours} jours = ${prixJour.toFixed(4)} €/jour.</p>`);
+}
+
+/* ---------- règle de trois ---------- */
+function calcRegleDeTrois() {
+  const part = parseFloat(document.getElementById("r3-part").value);
+  const total = parseFloat(document.getElementById("r3-total").value);
+  const montant = parseFloat(document.getElementById("r3-montant").value);
+  if (!(part >= 0) || !(total > 0) || isNaN(montant)) return show("r3-result", "bad", "Complétez les trois champs (total &gt; 0).");
+  const resultat = montant * part / total;
+  show("r3-result", "neutral", `
+    <h3>Résultat</h3>
+    <div class="big">${fmtEur(resultat)}</div>
+    <div class="kv">
+      <span class="k">Proportion</span><span class="v">${part} / ${total} = ${(part / total * 100).toFixed(2)} %</span>
+      <span class="k">Formule</span><span class="v">${fmtEur(montant)} × ${part} ÷ ${total}</span>
+      <span class="k">Reste</span><span class="v">${fmtEur(montant - resultat)} (${(100 - part / total * 100).toFixed(2)} %)</span>
+    </div>`);
+}
+
+/* ---------- prorata TVA ---------- */
+function calcProrataTva() {
+  const ded = parseFloat(document.getElementById("pv-ded").value);
+  const total = parseFloat(document.getElementById("pv-total").value);
+  const tva = parseFloat(document.getElementById("pv-tva").value);
+  if (!(ded >= 0) || !(total > 0)) return show("pv-result", "bad", "Complétez les deux chiffres d'affaires (total &gt; 0).");
+  if (ded > total) return show("pv-result", "bad", "Le CA avec droit à déduction ne peut pas dépasser le CA total.");
+  const brut = ded / total * 100;
+  const prorata = Math.min(100, Math.ceil(brut));
+  let extra = "";
+  if (!isNaN(tva) && tva >= 0) {
+    extra = `<span class="k">TVA déductible</span><span class="v">${fmtEur(tva * prorata / 100)} (sur ${fmtEur(tva)})</span>
+             <span class="k">TVA non déductible</span><span class="v">${fmtEur(tva - tva * prorata / 100)}</span>`;
+  }
+  show("pv-result", "neutral", `
+    <h3>Prorata général de déduction</h3>
+    <div class="big">${prorata} %</div>
+    <div class="kv">
+      <span class="k">Calcul exact</span><span class="v">${brut.toFixed(4)} % → arrondi à l'unité supérieure</span>
+      ${extra}
+    </div>`);
+}
+
+/* ---------- TVA / VIES ---------- */
+async function checkTva() {
+  const raw = document.getElementById("tva-num").value.replace(/[\s.\-]/g, "").toUpperCase();
+  hide("bce-result");
+  if (!/^[A-Z]{2}[0-9A-Z+*]{2,12}$/.test(raw)) {
+    return show("tva-result", "bad", "Format invalide. Exemple : <b>BE0403199702</b> (code pays + numéro).");
+  }
+  const btn = document.getElementById("tva-btn");
+  btn.disabled = true; btn.textContent = "Interrogation de VIES…";
+  show("tva-result", "neutral", "⏳ Consultation du service VIES de la Commission européenne…");
+  try {
+    const r = await fetch(`/api/vies/${raw.slice(0, 2)}/${raw.slice(2)}`);
+    const d = await r.json();
+    if (d.error && d.valid !== false) {
+      show("tva-result", "warn", "⚠️ " + esc(d.error));
+    } else if (d.valid) {
+      show("tva-result", "ok", `
+        <h3><span class="badge ok">✓ NUMÉRO VALIDE</span></h3>
+        <div class="kv">
+          <span class="k">Numéro</span><span class="v">${esc(d.countryCode + " " + d.vatNumber)}</span>
+          <span class="k">Dénomination</span><span class="v">${esc(d.name || "non communiquée par ce pays")}</span>
+          <span class="k">Adresse</span><span class="v">${esc(d.address || "non communiquée par ce pays")}</span>
+          <span class="k">Date de consultation</span><span class="v">${esc(d.requestDate || "-")}</span>
+          ${d.consultationNumber ? `<span class="k">N° de consultation VIES</span><span class="v">${esc(d.consultationNumber)} <button class="copy" onclick="navigator.clipboard.writeText('${esc(d.consultationNumber)}')">copier</button></span>` : ""}
+        </div>
+        <p style="margin-top:10px;font-size:.8rem;color:var(--muted)">Conservez le n° de consultation : il prouve la vérification en cas de contrôle.</p>`);
+    } else {
+      show("tva-result", "bad", `
+        <h3><span class="badge bad">✗ NUMÉRO INVALIDE</span></h3>
+        <p style="margin-top:8px">Le numéro <b>${esc(raw)}</b> n'est pas enregistré comme assujetti à la TVA intracommunautaire (VIES, ${new Date().toLocaleDateString("fr-BE")}).</p>`);
+    }
+    if (raw.startsWith("BE") && d.valid) loadBce(raw.slice(2));
+  } catch (e) {
+    show("tva-result", "bad", "Erreur de connexion au serveur local : " + esc(e.message));
+  } finally {
+    btn.disabled = false; btn.textContent = "Vérifier";
+  }
+}
+
+async function loadBce(number) {
+  show("bce-result", "neutral", "⏳ Recherche des informations publiques BCE…");
+  try {
+    const r = await fetch(`/api/bce/${number}`);
+    const d = await r.json();
+    if (d.error) return show("bce-result", "warn", "⚠️ " + esc(d.error));
+    const f = d.fields || {};
+    const rows = [
+      ["Numéro d'entreprise", d.formatted], ["Dénomination", f.denomination],
+      ["Statut", f.statut], ["Situation juridique", f.situationJuridique],
+      ["Forme légale", f.formeLegale], ["Date de début", f.dateDebut],
+      ["Adresse du siège", f.adresseSiege], ["Type d'entité", f.typeEntite],
+      ["Unités d'établissement", f.nombreUE], ["Téléphone", f.telephone],
+      ["E-mail", f.email], ["Site web", f.web],
+    ].filter(([, v]) => v);
+    show("bce-result", "neutral", `
+      <h3>🇧🇪 Banque-Carrefour des Entreprises${d.source ? "" : " (accès direct indisponible)"}</h3>
+      <div class="kv">${rows.map(([k, v]) => `<span class="k">${esc(k)}</span><span class="v">${esc(v)}</span>`).join("")}</div>
+      <p style="margin-top:10px"><a href="${esc(d.officialUrl)}" target="_blank" rel="noopener">Fiche complète sur le site officiel de la BCE ↗</a></p>`);
+  } catch {
+    hide("bce-result");
+  }
+}
+
+/* ---------- IBAN ---------- */
+async function checkIban() {
+  const raw = document.getElementById("iban-num").value;
+  if (!raw.trim()) return show("iban-result", "bad", "Saisissez un IBAN.");
+  const btn = document.getElementById("iban-btn");
+  btn.disabled = true; btn.textContent = "Validation…";
+  show("iban-result", "neutral", "⏳ Validation en cours…");
+  try {
+    const r = await fetch(`/api/iban/${encodeURIComponent(raw.replace(/\s/g, ""))}`);
+    const d = await r.json();
+    const checks = `<ul class="checks">${(d.checks || []).map(c => `<li>${c.ok ? "✅" : "❌"} ${esc(c.label)}</li>`).join("")}</ul>`;
+    if (!d.valid) {
+      show("iban-result", "bad", `<h3><span class="badge bad">✗ IBAN INVALIDE</span></h3>${checks}`);
+    } else {
+      const b = d.bank;
+      show("iban-result", "ok", `
+        <h3><span class="badge ok">✓ IBAN VALIDE</span></h3>
+        <div class="kv">
+          <span class="k">IBAN formaté</span><span class="v">${esc(d.formatted)} <button class="copy" onclick="navigator.clipboard.writeText('${esc(d.iban)}')">copier</button></span>
+          <span class="k">Pays</span><span class="v">${esc(d.country)}</span>
+          ${d.bankCode ? `<span class="k">Code banque</span><span class="v">${esc(d.bankCode)}</span>` : ""}
+          ${b && b.bic ? `<span class="k">BIC / SWIFT</span><span class="v">${esc(b.bic)} <button class="copy" onclick="navigator.clipboard.writeText('${esc(b.bic)}')">copier</button></span>` : ""}
+          ${b && b.name ? `<span class="k">Banque</span><span class="v">${esc(b.name)}${b.city ? " — " + esc(b.city) : ""}</span>` : ""}
+          ${b ? `<span class="k">Source BIC</span><span class="v">${esc(b.source || "-")}</span>` : ""}
+        </div>
+        ${checks}
+        ${!b ? '<p style="margin-top:8px;font-size:.85rem;color:var(--muted)">BIC non trouvé automatiquement pour ce pays — l\'IBAN reste mathématiquement valide.</p>' : ""}`);
+    }
+  } catch (e) {
+    show("iban-result", "bad", "Erreur de connexion au serveur local : " + esc(e.message));
+  } finally {
+    btn.disabled = false; btn.textContent = "Valider";
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "name": "monoutilcompta-moc",
+  "version": "1.0.0",
+  "description": "MonOutilCompta (MOC) — Prorata, vérification TVA (VIES/BCE) et validation IBAN/BIC",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
