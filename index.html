@@ -6,64 +6,110 @@
 <title>MonOutilCompta — MOC</title>
 <style>
   :root {
-    --bg: #f4f6fb; --card: #ffffff; --ink: #1e2433; --muted: #67718a;
-    --accent: #2456e6; --accent-soft: #e8eeff; --ok: #0f9d58; --ok-soft: #e6f6ec;
-    --bad: #d93025; --bad-soft: #fdecea; --warn: #b06000; --warn-soft: #fff4e0;
-    --border: #dde3f0; --radius: 14px;
+    --bg: #faf9f5; --card: #ffffff; --ink: #1f1e1d; --muted: #6f6b62;
+    --accent: #c15f3c; --accent-hover: #a94e2e; --accent-soft: #f6ebe4;
+    --ok: #2e7d4f; --ok-soft: #eaf4ee; --bad: #c6392e; --bad-soft: #fbedeb;
+    --warn: #9a6700; --warn-soft: #fdf5df; --border: #e7e4dc; --radius: 12px;
+    --shadow: 0 1px 3px rgba(31,30,29,.06), 0 4px 14px rgba(31,30,29,.04);
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
   body {
-    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    font-family: ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
     background: var(--bg); color: var(--ink); min-height: 100vh;
+    display: flex; flex-direction: column;
+    -webkit-font-smoothing: antialiased;
   }
-  header {
-    background: linear-gradient(120deg, #1b2a5e, #2456e6);
-    color: #fff; padding: 26px 20px 20px; text-align: center;
-  }
-  header h1 { font-size: 1.5rem; font-weight: 650; letter-spacing: .2px; }
-  header p { opacity: .85; font-size: .9rem; margin-top: 5px; }
-  #status { display: inline-flex; align-items: center; gap: 7px; margin-top: 10px;
-    background: rgba(255,255,255,.14); padding: 4px 14px; border-radius: 999px; font-size: .8rem; }
-  #status .dot { width: 9px; height: 9px; border-radius: 50%; background: #ffb300; }
-  #status.on .dot { background: #3ddc84; box-shadow: 0 0 6px #3ddc84; }
-  #status.off .dot { background: #ff5252; }
 
-  nav { display: flex; justify-content: center; gap: 8px; padding: 16px 12px 0; flex-wrap: wrap; }
+  /* ---- barre supérieure ---- */
+  header.topbar {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 18px;
+    padding: 0 22px; height: 60px;
+    background: rgba(250,249,245,.88); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+  .brand { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; }
+  .brand .logo { font-size: 1.25rem; }
+  .brand-name {
+    font-family: ui-serif, Georgia, "Times New Roman", serif;
+    font-size: 1.18rem; font-weight: 650; letter-spacing: .1px;
+  }
+  .brand-tag {
+    font-size: .68rem; font-weight: 700; color: var(--accent);
+    border: 1px solid var(--accent); border-radius: 5px; padding: 1px 5px;
+    letter-spacing: .8px; transform: translateY(-2px);
+  }
+  header.topbar nav {
+    display: flex; gap: 4px; flex: 1; overflow-x: auto; scrollbar-width: none;
+  }
+  header.topbar nav::-webkit-scrollbar { display: none; }
   nav button {
-    border: 1px solid var(--border); background: var(--card); color: var(--ink);
-    padding: 10px 22px; border-radius: 999px; font-size: .95rem; cursor: pointer;
-    font-weight: 550; transition: all .15s;
+    border: none; background: transparent; color: var(--muted);
+    padding: 8px 14px; border-radius: 8px; font-size: .92rem; cursor: pointer;
+    font-weight: 550; transition: background .12s, color .12s; white-space: nowrap;
   }
-  nav button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-  nav button:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+  nav button:hover:not(.active) { background: #efede6; color: var(--ink); }
+  nav button.active { background: var(--ink); color: #fff; }
 
-  main { max-width: 860px; margin: 0 auto; padding: 18px 16px 60px; }
+  .top-right { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+  #status { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; color: var(--muted); white-space: nowrap; }
+  #status .dot { width: 8px; height: 8px; border-radius: 50%; background: #d9a400; flex: none; }
+  #status.on .dot { background: #34a853; }
+  #status.off .dot { background: var(--bad); }
+  #acct-chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--ink); color: #fff; border: none; cursor: pointer;
+    padding: 8px 16px; border-radius: 999px; font-size: .85rem; font-weight: 600;
+    white-space: nowrap; transition: background .12s;
+  }
+  #acct-chip:hover { background: #3a3733; }
+  #acct-chip.subscriber { background: var(--accent); }
+  #acct-chip.subscriber:hover { background: var(--accent-hover); }
+  @media (max-width: 760px) {
+    header.topbar { flex-wrap: wrap; height: auto; padding: 10px 14px; row-gap: 8px; }
+    header.topbar nav { order: 3; flex-basis: 100%; }
+    #status span:last-child { display: none; }
+  }
+
+  main { max-width: 860px; width: 100%; margin: 0 auto; padding: 26px 18px 60px; flex: 1; }
+  .page-title { margin: 4px 2px 2px; }
+  .page-title h1 {
+    font-family: ui-serif, Georgia, serif; font-size: 1.55rem; font-weight: 600; letter-spacing: .2px;
+  }
+  .page-title p { color: var(--muted); font-size: .92rem; margin-top: 4px; }
+
+  footer {
+    border-top: 1px solid var(--border); padding: 18px; text-align: center;
+    color: var(--muted); font-size: .8rem;
+  }
   section { display: none; }
   section.active { display: block; animation: fade .18s ease; }
   @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
 
   .card {
     background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 22px; margin-top: 16px; box-shadow: 0 1px 4px rgba(20,30,70,.05);
+    padding: 24px; margin-top: 18px; box-shadow: var(--shadow);
   }
-  .card h2 { font-size: 1.05rem; margin-bottom: 4px; }
-  .card .hint { color: var(--muted); font-size: .85rem; margin-bottom: 14px; }
+  .card h2 { font-size: 1.08rem; font-weight: 650; margin-bottom: 5px; letter-spacing: .1px; }
+  .card .hint { color: var(--muted); font-size: .86rem; line-height: 1.5; margin-bottom: 15px; }
 
-  label { display: block; font-size: .82rem; font-weight: 600; color: var(--muted); margin: 10px 0 4px; }
+  label { display: block; font-size: .8rem; font-weight: 600; color: var(--muted); margin: 10px 0 5px; }
   input, select {
     width: 100%; padding: 11px 13px; border: 1px solid var(--border); border-radius: 9px;
-    font-size: 1rem; background: #fbfcff; color: var(--ink);
+    font-size: .98rem; background: #fff; color: var(--ink); transition: border-color .12s, box-shadow .12s;
   }
-  input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+  input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
   @media (max-width: 640px) { .row, .row3 { grid-template-columns: 1fr; } }
 
   .btn {
     margin-top: 16px; background: var(--accent); color: #fff; border: none; cursor: pointer;
-    padding: 12px 26px; border-radius: 9px; font-size: 1rem; font-weight: 600; width: 100%;
+    padding: 12px 26px; border-radius: 9px; font-size: .98rem; font-weight: 600; width: 100%;
+    transition: background .12s; box-shadow: 0 1px 2px rgba(31,30,29,.15);
   }
-  .btn:hover { filter: brightness(1.08); }
+  .btn:hover { background: var(--accent-hover); }
   .btn:disabled { opacity: .6; cursor: wait; }
 
   .result { margin-top: 16px; border-radius: 10px; padding: 16px; display: none; font-size: .95rem; }
@@ -123,20 +169,23 @@
 </head>
 <body>
 
-<header>
-  <h1>🧮 MonOutilCompta <span style="opacity:.7;font-weight:400">— MOC</span></h1>
-  <p>Prorata · Vérification TVA (VIES / BCE) · Validation IBAN &amp; BIC · Outils PDF</p>
-  <span id="status"><span class="dot"></span><span id="statusTxt">Connexion au serveur…</span></span>
-  <span id="acct-chip" style="display:inline-flex;align-items:center;gap:7px;margin:10px 0 0 8px;background:rgba(255,255,255,.14);padding:4px 14px;border-radius:999px;font-size:.8rem;cursor:pointer" onclick="goTab('compte')">👤 …</span>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">🧮</span>
+    <span class="brand-name">MonOutilCompta</span>
+    <span class="brand-tag">MOC</span>
+  </div>
+  <nav>
+    <button class="active" data-tab="tva">Vérification TVA</button>
+    <button data-tab="iban">IBAN / BIC</button>
+    <button data-tab="pdf">Outils PDF</button>
+    <button data-tab="prorata">Prorata</button>
+  </nav>
+  <div class="top-right">
+    <span id="status"><span class="dot"></span><span id="statusTxt">connexion…</span></span>
+    <button id="acct-chip" onclick="goTab('compte')">Se connecter</button>
+  </div>
 </header>
-
-<nav>
-  <button class="active" data-tab="tva">🏢 Vérification TVA</button>
-  <button data-tab="iban">🏦 IBAN / BIC</button>
-  <button data-tab="pdf">📄 PDF</button>
-  <button data-tab="prorata">📐 Prorata</button>
-  <button data-tab="compte">👤 Compte</button>
-</nav>
 
 <main>
 
@@ -301,14 +350,21 @@
 
 </main>
 
+<footer>
+  <b>MonOutilCompta</b> — Vérification TVA (VIES / BCE) · IBAN &amp; BIC · Outils PDF · Prorata<br>
+  Vos documents PDF sont traités localement dans votre navigateur, jamais envoyés sur un serveur.
+</footer>
+
 <script>
 /* ---------- navigation ---------- */
-document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => {
-  document.querySelectorAll("nav button").forEach(x => x.classList.remove("active"));
+function showTab(name) {
   document.querySelectorAll("section").forEach(x => x.classList.remove("active"));
-  b.classList.add("active");
-  document.getElementById("tab-" + b.dataset.tab).classList.add("active");
-}));
+  const sec = document.getElementById("tab-" + name);
+  if (sec) sec.classList.add("active");
+  document.querySelectorAll("nav button").forEach(x => x.classList.toggle("active", x.dataset.tab === name));
+  window.scrollTo({ top: 0 });
+}
+document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
 
 /* ---------- état serveur ---------- */
 async function ping() {
@@ -321,10 +377,7 @@ async function ping() {
 }
 ping(); setInterval(ping, 15000);
 
-function goTab(name) {
-  const b = document.querySelector(`nav button[data-tab="${name}"]`);
-  if (b) b.click();
-}
+function goTab(name) { showTab(name); }
 
 /* ---------- compte / abonnement ---------- */
 let sb = null, me = null, siteCfg = null;
@@ -367,9 +420,11 @@ async function refreshMe() {
 function renderChip() {
   const c = document.getElementById("acct-chip");
   if (me && me.authenticated) {
-    c.innerHTML = me.subscribed ? "⭐ " + esc(me.email) : "👤 " + esc(me.email) + " (gratuit)";
+    c.className = me.subscribed ? "subscriber" : "";
+    c.innerHTML = (me.subscribed ? "⭐ " : "") + esc(me.email);
   } else {
-    c.textContent = "👤 Se connecter / créer un compte";
+    c.className = "";
+    c.textContent = "Se connecter";
   }
 }
 
