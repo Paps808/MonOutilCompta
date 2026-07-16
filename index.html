@@ -6,17 +6,22 @@
 <title>MonOutilCompta — MOC</title>
 <style>
   :root {
-    --bg: #faf9f5; --card: #ffffff; --ink: #1f1e1d; --muted: #6f6b62;
-    --accent: #c15f3c; --accent-hover: #a94e2e; --accent-soft: #f6ebe4;
-    --ok: #2e7d4f; --ok-soft: #eaf4ee; --bad: #c6392e; --bad-soft: #fbedeb;
-    --warn: #9a6700; --warn-soft: #fdf5df; --border: #e7e4dc; --radius: 12px;
-    --shadow: 0 1px 3px rgba(31,30,29,.06), 0 4px 14px rgba(31,30,29,.04);
+    --bg: #0c0c10; --card: #15151b; --ink: #ece9e2; --muted: #9a948a;
+    --accent: #d3a04b; --accent-hover: #e7b967; --accent-soft: #2b2312;
+    --ok: #4fbf82; --ok-soft: #12271b; --bad: #e5695c; --bad-soft: #2d1412;
+    --warn: #e0b34c; --warn-soft: #2a2110; --border: #2a2a34; --radius: 12px;
+    --shadow: 0 2px 6px rgba(0,0,0,.45), 0 10px 30px rgba(0,0,0,.35);
+    --gold-line: rgba(211,160,75,.45);
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html { scroll-behavior: smooth; }
   body {
     font-family: ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
-    background: var(--bg); color: var(--ink); min-height: 100vh;
+    background-color: var(--bg);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420' viewBox='0 0 420 420'%3E%3Crect fill='%230c0c10' width='420' height='420'/%3E%3Cg stroke='%23c78f2d' stroke-opacity='.28' stroke-width='1.4' stroke-linejoin='round'%3E%3Cpath fill='%230e0e13' d='M0 0L210 0L150 110Z'/%3E%3Cpath fill='%23121219' d='M210 0L420 0L310 120Z'/%3E%3Cpath fill='%230a0a0e' d='M210 0L310 120L150 110Z'/%3E%3Cpath fill='%2314141c' d='M0 0L150 110L0 210Z'/%3E%3Cpath fill='%230d0d12' d='M420 0L420 210L310 120Z'/%3E%3Cpath fill='%23101017' d='M150 110L310 120L210 230Z'/%3E%3Cpath fill='%230b0b10' d='M310 120L420 210L320 310Z'/%3E%3Cpath fill='%2313131a' d='M310 120L210 230L320 310Z'/%3E%3Cpath fill='%230f0f15' d='M150 110L210 230L0 210Z'/%3E%3Cpath fill='%23121218' d='M0 210L210 230L110 320Z'/%3E%3Cpath fill='%230a0a0f' d='M0 210L0 420L110 320Z'/%3E%3Cpath fill='%2315151d' d='M0 420L110 320L210 420Z'/%3E%3Cpath fill='%230d0d13' d='M110 320L210 230L210 420Z'/%3E%3Cpath fill='%23111118' d='M210 230L320 310L210 420Z'/%3E%3Cpath fill='%230b0b0f' d='M320 310L210 420L420 420Z'/%3E%3Cpath fill='%2313131b' d='M320 310L420 210L420 420Z'/%3E%3C/g%3E%3C/svg%3E");
+    background-size: 420px 420px;
+    background-attachment: fixed;
+    color: var(--ink); min-height: 100vh;
     display: flex; flex-direction: column;
     -webkit-font-smoothing: antialiased;
   }
@@ -26,8 +31,8 @@
     position: sticky; top: 0; z-index: 50;
     display: flex; align-items: center; gap: 18px;
     padding: 0 22px; height: 60px;
-    background: rgba(250,249,245,.88); backdrop-filter: blur(10px);
-    border-bottom: 1px solid var(--border);
+    background: rgba(12,12,16,.82); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--gold-line);
   }
   .brand { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; }
   .brand .logo { font-size: 1.25rem; }
@@ -49,8 +54,8 @@
     padding: 8px 14px; border-radius: 8px; font-size: .92rem; cursor: pointer;
     font-weight: 550; transition: background .12s, color .12s; white-space: nowrap;
   }
-  nav button:hover:not(.active) { background: #efede6; color: var(--ink); }
-  nav button.active { background: var(--ink); color: #fff; }
+  nav button:hover:not(.active) { background: #22222b; color: var(--ink); }
+  nav button.active { background: var(--accent); color: #16100a; }
 
   .top-right { display: flex; align-items: center; gap: 12px; margin-left: auto; }
   #status { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; color: var(--muted); white-space: nowrap; }
@@ -59,12 +64,13 @@
   #status.off .dot { background: var(--bad); }
   #acct-chip {
     display: inline-flex; align-items: center; gap: 7px;
-    background: var(--ink); color: #fff; border: none; cursor: pointer;
+    background: transparent; color: var(--ink); cursor: pointer;
+    border: 1px solid var(--gold-line);
     padding: 8px 16px; border-radius: 999px; font-size: .85rem; font-weight: 600;
-    white-space: nowrap; transition: background .12s;
+    white-space: nowrap; transition: background .12s, border-color .12s;
   }
-  #acct-chip:hover { background: #3a3733; }
-  #acct-chip.subscriber { background: var(--accent); }
+  #acct-chip:hover { background: #22222b; border-color: var(--accent); }
+  #acct-chip.subscriber { background: var(--accent); color: #16100a; border-color: var(--accent); }
   #acct-chip.subscriber:hover { background: var(--accent-hover); }
   @media (max-width: 760px) {
     header.topbar { flex-wrap: wrap; height: auto; padding: 10px 14px; row-gap: 8px; }
@@ -95,29 +101,31 @@
   .card .hint { color: var(--muted); font-size: .86rem; line-height: 1.5; margin-bottom: 15px; }
 
   label { display: block; font-size: .8rem; font-weight: 600; color: var(--muted); margin: 10px 0 5px; }
-  input, select {
+  input, select, textarea {
     width: 100%; padding: 11px 13px; border: 1px solid var(--border); border-radius: 9px;
-    font-size: .98rem; background: #fff; color: var(--ink); transition: border-color .12s, box-shadow .12s;
+    font-size: .98rem; background: #101016; color: var(--ink); transition: border-color .12s, box-shadow .12s;
   }
-  input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  input::placeholder { color: #5c584f; }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
   @media (max-width: 640px) { .row, .row3 { grid-template-columns: 1fr; } }
 
   .btn {
-    margin-top: 16px; background: var(--accent); color: #fff; border: none; cursor: pointer;
-    padding: 12px 26px; border-radius: 9px; font-size: .98rem; font-weight: 600; width: 100%;
-    transition: background .12s; box-shadow: 0 1px 2px rgba(31,30,29,.15);
+    margin-top: 16px; background: linear-gradient(180deg, #e0b054, #c8933a);
+    color: #16100a; border: none; cursor: pointer;
+    padding: 12px 26px; border-radius: 9px; font-size: .98rem; font-weight: 700; width: 100%;
+    transition: filter .12s; box-shadow: 0 2px 8px rgba(211,160,75,.25);
   }
-  .btn:hover { background: var(--accent-hover); }
+  .btn:hover { filter: brightness(1.1); }
   .btn:disabled { opacity: .6; cursor: wait; }
 
   .result { margin-top: 16px; border-radius: 10px; padding: 16px; display: none; font-size: .95rem; }
   .result.show { display: block; }
-  .result.ok { background: var(--ok-soft); border: 1px solid #bfe5cd; }
-  .result.bad { background: var(--bad-soft); border: 1px solid #f2c4c0; }
-  .result.warn { background: var(--warn-soft); border: 1px solid #ecd9b0; }
-  .result.neutral { background: var(--accent-soft); border: 1px solid #c9d7fb; }
+  .result.ok { background: var(--ok-soft); border: 1px solid #2c5c40; }
+  .result.bad { background: var(--bad-soft); border: 1px solid #5f2d27; }
+  .result.warn { background: var(--warn-soft); border: 1px solid #5c4b1e; }
+  .result.neutral { background: var(--accent-soft); border: 1px solid #52421f; }
   .result h3 { font-size: 1rem; margin-bottom: 8px; }
   .kv { display: grid; grid-template-columns: 190px 1fr; gap: 4px 12px; margin-top: 8px; }
   .kv .k { color: var(--muted); font-size: .84rem; }
@@ -149,12 +157,12 @@
   .thumb.open { border-color: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
   .rangechip {
     display: inline-flex; align-items: center; gap: 6px; margin: 8px 8px 0 0; padding: 4px 10px;
-    background: var(--accent-soft); border: 1px solid #c9d7fb; border-radius: 999px; font-size: .82rem;
+    background: var(--accent-soft); border: 1px solid var(--gold-line); border-radius: 999px; font-size: .82rem;
   }
   .rangechip button { border: none; background: none; cursor: pointer; color: var(--bad); font-weight: 700; }
   .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 12px; }
   @media (max-width: 640px) { .tiles { grid-template-columns: 1fr; } }
-  .tile { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .tile { background: #101016; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
   .tile .k { display: block; color: var(--muted); font-size: .75rem; font-weight: 600;
     text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
   .tile .v { font-size: 1.25rem; font-weight: 700; }
@@ -163,8 +171,9 @@
   ul.checks { list-style: none; margin-top: 8px; }
   ul.checks li { padding: 3px 0; font-size: .88rem; }
   a { color: var(--accent); }
-  .copy { border: 1px solid var(--border); background: #fff; border-radius: 7px; padding: 4px 10px;
-    cursor: pointer; font-size: .78rem; margin-left: 8px; }
+  .copy { border: 1px solid var(--gold-line); background: transparent; color: var(--ink); border-radius: 7px;
+    padding: 4px 10px; cursor: pointer; font-size: .78rem; margin-left: 8px; }
+  .copy:hover { background: #22222b; }
 </style>
 </head>
 <body>
@@ -455,7 +464,7 @@ function renderAccount() {
       </div>
       <div class="row">
         <button class="btn" onclick="acctLogin()">Se connecter</button>
-        <button class="btn" style="background:#fff;color:var(--accent);border:2px solid var(--accent)" onclick="acctSignup()">Créer mon compte gratuit</button>
+        <button class="btn" style="background:transparent;color:var(--accent);border:2px solid var(--accent);box-shadow:none" onclick="acctSignup()">Créer mon compte gratuit</button>
       </div>
       <div class="result" id="acct-msg"></div>`;
     return;
@@ -481,7 +490,7 @@ function renderAccount() {
       </div>
       ${siteCfg && !siteCfg.billingReady ? '<p class="hint" style="margin-top:8px">⚠️ Paiements en cours d\'activation — réessayez bientôt.</p>' : ""}
     `}
-    <button class="btn" style="margin-top:10px;background:#fff;color:var(--muted);border:1px solid var(--border)" onclick="acctLogout()">Se déconnecter</button>
+    <button class="btn" style="margin-top:10px;background:transparent;color:var(--muted);border:1px solid var(--border);box-shadow:none" onclick="acctLogout()">Se déconnecter</button>
     <div class="result" id="acct-msg"></div>`;
 }
 
@@ -982,7 +991,7 @@ function mergeListRefresh() {
 }
 function mergeListRender() {
   document.getElementById("merge-list").innerHTML = mergeOrder.map((f, i) => `
-    <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;margin-top:6px;background:#fbfcff">
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;margin-top:6px;background:#101016">
       <span style="flex:1;font-size:.9rem">${i + 1}. ${esc(f.name)} <span style="color:var(--muted)">(${(f.size / 1024).toFixed(0)} Ko)</span></span>
       <button class="copy" onclick="mergeMove(${i},-1)" ${i === 0 ? "disabled" : ""}>↑</button>
       <button class="copy" onclick="mergeMove(${i},1)" ${i === mergeOrder.length - 1 ? "disabled" : ""}>↓</button>
