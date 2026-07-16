@@ -251,7 +251,7 @@
 
   <div class="card">
     <h2>Calcul de prorata</h2>
-    <p class="hint">Période et montant total → nombre de jours, prix par jour et répartition par année civile.</p>
+    <p class="hint" data-i18n="hint_prorata">Période et montant total → nombre de jours, prix par jour et répartition par année civile.</p>
     <div class="row">
       <div><label>Date de début</label><input type="date" id="pt-debut"></div>
       <div><label>Date de fin</label><input type="date" id="pt-fin"></div>
@@ -264,7 +264,7 @@
 
   <div class="card">
     <h2>Règle de trois (prorata simple)</h2>
-    <p class="hint">Répartir un montant proportionnellement : X représente quelle part de Y appliquée à Z ?</p>
+    <p class="hint" data-i18n="hint_r3">Répartir un montant proportionnellement : X représente quelle part de Y appliquée à Z ?</p>
     <div class="row3">
       <div><label>Part (ex. 40 m², 3 personnes…)</label><input type="number" id="r3-part" step="any" placeholder="40"></div>
       <div><label>Total (ex. 100 m², 5 personnes…)</label><input type="number" id="r3-total" step="any" placeholder="100"></div>
@@ -276,7 +276,7 @@
 
   <div class="card">
     <h2>Prorata général de déduction TVA (assujetti mixte)</h2>
-    <p class="hint">CA avec droit à déduction ÷ CA total — arrondi à l'unité <b>supérieure</b> (art. 46 §1 CTVA belge).</p>
+    <p class="hint" data-i18n="hint_ptva">CA avec droit à déduction ÷ CA total — arrondi à l'unité <b>supérieure</b> (art. 46 §1 CTVA belge).</p>
     <div class="row">
       <div><label>Chiffre d'affaires avec droit à déduction (€)</label><input type="number" id="pv-ded" step="0.01" placeholder="250000"></div>
       <div><label>Chiffre d'affaires total (€)</label><input type="number" id="pv-total" step="0.01" placeholder="400000"></div>
@@ -294,7 +294,7 @@
 <section id="tab-tva" class="active">
   <div class="card">
     <h2>Vérification d'un numéro de TVA européen (VIES)</h2>
-    <p class="hint">Saisissez le numéro avec le code pays, ex. <b>BE0403199702</b>, <b>FR40303265045</b>, <b>NL810433941B01</b>.
+    <p class="hint" data-i18n="hint_tva">Saisissez le numéro avec le code pays, ex. <b>BE0403199702</b>, <b>FR40303265045</b>, <b>NL810433941B01</b>.
     Couverture : <b>les 27 pays de l'UE</b> (consultation officielle VIES, Commission européenne),
     l'Irlande du Nord (<b>XI</b>) et le Royaume-Uni (<b>GB</b> : contrôle du format + lien direct vers le vérificateur officiel gov.uk).
     Le format est contrôlé selon les règles de chaque pays avant l'envoi.
@@ -311,7 +311,7 @@
 <section id="tab-iban">
   <div class="card">
     <h2>Validation IBAN &amp; identification de la banque (BIC)</h2>
-    <p class="hint"><b>Tous les pays IBAN sont acceptés</b> (toute l'Europe et au-delà, ~85 pays) :
+    <p class="hint" data-i18n="hint_iban"><b>Tous les pays IBAN sont acceptés</b> (toute l'Europe et au-delà, ~85 pays) :
     longueur officielle du pays, clé internationale modulo 97, et clés nationales belge et française (RIB) en plus.
     Le BIC et le nom de la banque sont recherchés automatiquement lorsque le pays le permet (BE, DE, NL, LU, AT, LI…).</p>
     <label>IBAN</label>
@@ -334,7 +334,7 @@
 
   <div class="card">
     <h2>✂️ Diviser un PDF (Split)</h2>
-    <p class="hint">Choisissez un PDF : ses pages s'affichent en miniatures. <b>Cliquez</b> sur la première
+    <p class="hint" data-i18n="hint_split">Choisissez un PDF : ses pages s'affichent en miniatures. <b>Cliquez</b> sur la première
     page d'un document (début), puis sur sa dernière page (fin) — recommencez pour chaque document à créer.
     Chaque paire de clics = un fichier PDF séparé.
     <b>Confidentialité :</b> tout se fait dans votre navigateur, le fichier n'est envoyé nulle part.</p>
@@ -356,7 +356,7 @@
 
   <div class="card">
     <h2>🧷 Fusionner des PDF (Fuse)</h2>
-    <p class="hint">Combiner plusieurs PDF en un seul, dans l'ordre de votre choix.</p>
+    <p class="hint" data-i18n="hint_merge">Combiner plusieurs PDF en un seul, dans l'ordre de votre choix.</p>
     <label>Fichiers PDF (sélection multiple)</label>
     <input type="file" id="merge-files" accept=".pdf,application/pdf" multiple onchange="mergeListRefresh()">
     <div id="merge-list" style="margin-top:10px"></div>
@@ -366,7 +366,7 @@
 
   <div class="card">
     <h2>📝 PDF → Word (haute fidélité)</h2>
-    <p class="hint">Conversion complète en <b>.docx</b> : mise en page, logos/images, colonnes et tableaux
+    <p class="hint" data-i18n="hint_word">Conversion complète en <b>.docx</b> : mise en page, logos/images, colonnes et tableaux
     sont reconstruits (moteur pdf2docx). Si le PDF est un <b>scan</b>, l'OCR se lance
     <b>automatiquement</b> avant la conversion — un seul bouton pour tout.</p>
     <div class="row">
@@ -386,7 +386,7 @@
 
   <div class="card">
     <h2>🔎 OCR — reconnaissance de texte (PDF scanné ou image)</h2>
-    <p class="hint">Reconnaît le texte d'un PDF scanné ou d'une image (JPG, PNG). Le premier lancement
+    <p class="hint" data-i18n="hint_ocr">Reconnaît le texte d'un PDF scanné ou d'une image (JPG, PNG). Le premier lancement
     télécharge le moteur (~15 Mo), ensuite c'est instantané. Tout reste dans votre navigateur.</p>
     <div class="row">
       <div><label>Fichier PDF ou image</label><input type="file" id="ocr-file" accept=".pdf,image/*"></div>
@@ -408,8 +408,17 @@
 </main>
 
 <footer>
-  <b>MonOutilCompta</b> — Vérification TVA (VIES / BCE) · IBAN &amp; BIC · Outils PDF · Prorata<br>
-  Vos documents PDF sont traités localement dans votre navigateur, jamais envoyés sur un serveur.
+  <div style="margin-bottom:12px">
+    <select id="lang-select" onchange="setLang(this.value)"
+      style="width:auto;padding:7px 12px;font-size:.85rem;border-radius:999px;cursor:pointer">
+      <option value="fr">🌐 Français</option>
+      <option value="nl">🌐 Nederlands</option>
+      <option value="en">🌐 English</option>
+    </select>
+  </div>
+  <p><b>MonOutilCompta</b> — <span data-i18n="footer_desc">Vérification TVA (VIES / BCE) · IBAN &amp; BIC · Outils PDF · Prorata</span><br>
+  <span data-i18n="footer_privacy">Vos documents PDF sont traités localement dans votre navigateur, jamais envoyés sur un serveur.</span></p>
+  <p style="margin-top:12px;letter-spacing:.4px">© MonOutilsCompta 2026 ® - L.Dupz Productions</p>
 </footer>
 
 <script>
@@ -422,6 +431,227 @@ function showTab(name) {
   window.scrollTo({ top: 0 });
 }
 document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
+
+/* ---------- langues (FR par défaut, NL, EN) ---------- */
+const I18N = {
+  nl: {
+    "Vérification TVA": "Btw-controle", "Outils PDF": "PDF-tools", "Prorata": "Pro rata",
+    "Se connecter": "Inloggen", "connexion…": "verbinden…",
+    "Serveur connecté": "Server verbonden", "Serveur injoignable": "Server onbereikbaar",
+    "Vérification d'un numéro de TVA européen (VIES)": "Controle van een Europees btw-nummer (VIES)",
+    "Numéro de TVA": "Btw-nummer", "Vérifier": "Controleren",
+    "Validation IBAN & identification de la banque (BIC)": "IBAN-validatie & identificatie van de bank (BIC)",
+    "Valider": "Valideren",
+    "✂️ Diviser un PDF (Split)": "✂️ PDF splitsen (Split)",
+    "🧷 Fusionner des PDF (Fuse)": "🧷 PDF's samenvoegen (Fuse)",
+    "📝 PDF → Word (haute fidélité)": "📝 PDF → Word (hoge kwaliteit)",
+    "🔎 OCR — reconnaissance de texte (PDF scanné ou image)": "🔎 OCR — tekstherkenning (gescande PDF of afbeelding)",
+    "Fichier PDF": "PDF-bestand", "Fichiers PDF (sélection multiple)": "PDF-bestanden (meervoudige selectie)",
+    "Ou plages manuelles (ex. 1-3,5 — utilisées si aucun clic)": "Of handmatige reeksen (bv. 1-3,5 — indien geen klik)",
+    "Mode (si plages manuelles)": "Modus (bij handmatige reeksen)",
+    "Un seul PDF avec les pages choisies": "Eén PDF met de gekozen pagina's",
+    "Un fichier par page": "Eén bestand per pagina",
+    "Diviser": "Splitsen", "Fusionner": "Samenvoegen", "Convertir en Word": "Converteren naar Word",
+    "Langue (utile si document scanné)": "Taal (nuttig bij gescand document)",
+    "Langue du document": "Taal van het document", "Fichier PDF ou image": "PDF-bestand of afbeelding",
+    "Lancer l'OCR": "OCR starten",
+    "Français": "Frans", "Néerlandais": "Nederlands", "Anglais": "Engels", "Allemand": "Duits", "Français + Anglais": "Frans + Engels",
+    "Calcul de prorata": "Pro-rataberekening", "Date de début": "Begindatum", "Date de fin": "Einddatum",
+    "Montant total (€)": "Totaalbedrag (€)", "🧮 Calculer": "🧮 Berekenen", "Calculer": "Berekenen",
+    "Règle de trois (prorata simple)": "Regel van drie (eenvoudige verhouding)",
+    "Part (ex. 40 m², 3 personnes…)": "Deel (bv. 40 m², 3 personen…)",
+    "Total (ex. 100 m², 5 personnes…)": "Totaal (bv. 100 m², 5 personen…)",
+    "Montant à répartir (€)": "Te verdelen bedrag (€)",
+    "Prorata général de déduction TVA (assujetti mixte)": "Algemeen verhoudingsgetal btw-aftrek (gemengde belastingplichtige)",
+    "Chiffre d'affaires avec droit à déduction (€)": "Omzet met recht op aftrek (€)",
+    "Chiffre d'affaires total (€)": "Totale omzet (€)",
+    "TVA en amont à répartir (€) — optionnel": "Te verdelen voorbelasting (€) — optioneel",
+    "Connexion": "Inloggen", "Accédez à MonOutilCompta": "Toegang tot MonOutilCompta",
+    "Adresse e-mail": "E-mailadres", "Mot de passe": "Wachtwoord", "Rester connecté": "Aangemeld blijven",
+    "Vous ne pouvez pas accéder à votre compte ?": "Geen toegang tot uw account?",
+    "Pas encore de compte ?": "Nog geen account?", "S'inscrire gratuitement": "Gratis registreren",
+    "Inscription": "Registratie", "Mot de passe (6 caractères min.)": "Wachtwoord (min. 6 tekens)",
+    "Confirmez le mot de passe": "Bevestig het wachtwoord", "Créer mon compte gratuit": "Mijn gratis account aanmaken",
+    "Déjà inscrit ?": "Al geregistreerd?", "Mot de passe oublié": "Wachtwoord vergeten",
+    "Recevez un lien de réinitialisation par e-mail": "Ontvang een resetlink per e-mail",
+    "Envoyer le lien": "Link versturen", "← Retour à la connexion": "← Terug naar inloggen",
+    "Nouveau mot de passe": "Nieuw wachtwoord", "Choisissez votre nouveau mot de passe": "Kies uw nieuw wachtwoord",
+    "Nouveau mot de passe (6 caractères min.)": "Nieuw wachtwoord (min. 6 tekens)", "Enregistrer": "Opslaan",
+    "Compte gratuit : 5 vérifications TVA, 5 validations IBAN et 2 opérations PDF offertes chaque mois": "Gratis account: elke maand 5 btw-controles, 5 IBAN-validaties en 2 PDF-bewerkingen inbegrepen",
+    "Mensuel": "Maandelijks", "Annuel": "Jaarlijks", "⭐ 2 MOIS OFFERTS": "⭐ 2 MAANDEN GRATIS",
+    "Souplesse maximale, sans engagement": "Maximale flexibiliteit, zonder verbintenis",
+    "— soit 4,08 €/mois": "— d.w.z. 4,08 €/maand",
+    "✅ Vérifications TVA (VIES + BCE)": "✅ Btw-controles (VIES + KBO)",
+    "illimitées": "onbeperkt", "illimités": "onbeperkt",
+    "✅ Validations IBAN / BIC": "✅ IBAN- / BIC-validaties", "✅ Outils PDF": "✅ PDF-tools",
+    "(division, fusion, Word, OCR)": "(splitsen, samenvoegen, Word, OCR)",
+    "✅ Conversion Word haute fidélité": "✅ Word-conversie in hoge kwaliteit",
+    "✅ Sans engagement — annulable en ligne": "✅ Zonder verbintenis — online opzegbaar",
+    "➕ Le meilleur prix garanti à l'année": "➕ De beste prijs, gegarandeerd per jaar",
+    "Choisir Mensuel →": "Kies Maandelijks →", "Choisir Annuel →": "Kies Jaarlijks →",
+    "Se déconnecter": "Uitloggen", "Gérer mon abonnement (facture, annulation…)": "Mijn abonnement beheren (factuur, opzegging…)",
+    "Formule gratuite — il vous reste ce mois-ci :": "Gratis formule — deze maand nog beschikbaar:",
+    "vérification(s) TVA ·": "btw-controle(s) ·", "opération(s) PDF.": "PDF-bewerking(en).",
+    "👤 Mon compte": "👤 Mijn account", "Formule": "Formule",
+    "Compte gratuit requis": "Gratis account vereist",
+    "(10 secondes) : 5 vérifications TVA, 5 validations IBAN et 2 opérations PDF offertes chaque mois.": "(10 seconden): elke maand 5 btw-controles, 5 IBAN-validaties en 2 PDF-bewerkingen gratis.",
+    "Créer mon compte / me connecter": "Account aanmaken / inloggen",
+    "Quota gratuit du mois épuisé.": "Gratis maandquotum opgebruikt.", "Passez en illimité :": "Ga onbeperkt:",
+    "ou": "of", "S'abonner": "Abonneren", "4,99 € / mois": "4,99 € / maand", "49 € / an": "49 € / jaar",
+    "✓ NUMÉRO VALIDE": "✓ GELDIG NUMMER", "✗ NUMÉRO INVALIDE": "✗ ONGELDIG NUMMER",
+    "✓ IBAN VALIDE": "✓ GELDIGE IBAN", "✗ IBAN INVALIDE": "✗ ONGELDIGE IBAN",
+    "✓ Calcul effectué": "✓ Berekening uitgevoerd", "copier": "kopiëren",
+    "Dénomination": "Benaming", "Adresse": "Adres", "Numéro": "Nummer", "Pays": "Land",
+    "Code banque": "Bankcode", "Banque": "Bank", "Nombre de jours": "Aantal dagen", "Prix par jour": "Prijs per dag",
+  },
+  en: {
+    "Vérification TVA": "VAT check", "Outils PDF": "PDF tools", "Prorata": "Pro rata",
+    "Se connecter": "Sign in", "connexion…": "connecting…",
+    "Serveur connecté": "Server connected", "Serveur injoignable": "Server unreachable",
+    "Vérification d'un numéro de TVA européen (VIES)": "European VAT number check (VIES)",
+    "Numéro de TVA": "VAT number", "Vérifier": "Verify",
+    "Validation IBAN & identification de la banque (BIC)": "IBAN validation & bank identification (BIC)",
+    "Valider": "Validate",
+    "✂️ Diviser un PDF (Split)": "✂️ Split a PDF",
+    "🧷 Fusionner des PDF (Fuse)": "🧷 Merge PDFs",
+    "📝 PDF → Word (haute fidélité)": "📝 PDF → Word (high fidelity)",
+    "🔎 OCR — reconnaissance de texte (PDF scanné ou image)": "🔎 OCR — text recognition (scanned PDF or image)",
+    "Fichier PDF": "PDF file", "Fichiers PDF (sélection multiple)": "PDF files (multiple selection)",
+    "Ou plages manuelles (ex. 1-3,5 — utilisées si aucun clic)": "Or manual ranges (e.g. 1-3,5 — used if no clicks)",
+    "Mode (si plages manuelles)": "Mode (for manual ranges)",
+    "Un seul PDF avec les pages choisies": "One PDF with the selected pages",
+    "Un fichier par page": "One file per page",
+    "Diviser": "Split", "Fusionner": "Merge", "Convertir en Word": "Convert to Word",
+    "Langue (utile si document scanné)": "Language (useful for scanned documents)",
+    "Langue du document": "Document language", "Fichier PDF ou image": "PDF file or image",
+    "Lancer l'OCR": "Run OCR",
+    "Français": "French", "Néerlandais": "Dutch", "Anglais": "English", "Allemand": "German", "Français + Anglais": "French + English",
+    "Calcul de prorata": "Pro rata calculation", "Date de début": "Start date", "Date de fin": "End date",
+    "Montant total (€)": "Total amount (€)", "🧮 Calculer": "🧮 Calculate", "Calculer": "Calculate",
+    "Règle de trois (prorata simple)": "Rule of three (simple pro rata)",
+    "Part (ex. 40 m², 3 personnes…)": "Share (e.g. 40 m², 3 people…)",
+    "Total (ex. 100 m², 5 personnes…)": "Total (e.g. 100 m², 5 people…)",
+    "Montant à répartir (€)": "Amount to distribute (€)",
+    "Prorata général de déduction TVA (assujetti mixte)": "General VAT deduction pro rata (mixed taxable person)",
+    "Chiffre d'affaires avec droit à déduction (€)": "Turnover with right to deduct (€)",
+    "Chiffre d'affaires total (€)": "Total turnover (€)",
+    "TVA en amont à répartir (€) — optionnel": "Input VAT to allocate (€) — optional",
+    "Connexion": "Sign in", "Accédez à MonOutilCompta": "Access MonOutilCompta",
+    "Adresse e-mail": "Email address", "Mot de passe": "Password", "Rester connecté": "Stay signed in",
+    "Vous ne pouvez pas accéder à votre compte ?": "Can't access your account?",
+    "Pas encore de compte ?": "No account yet?", "S'inscrire gratuitement": "Sign up for free",
+    "Inscription": "Sign up", "Mot de passe (6 caractères min.)": "Password (min. 6 characters)",
+    "Confirmez le mot de passe": "Confirm password", "Créer mon compte gratuit": "Create my free account",
+    "Déjà inscrit ?": "Already registered?", "Mot de passe oublié": "Forgot password",
+    "Recevez un lien de réinitialisation par e-mail": "Receive a reset link by email",
+    "Envoyer le lien": "Send link", "← Retour à la connexion": "← Back to sign in",
+    "Nouveau mot de passe": "New password", "Choisissez votre nouveau mot de passe": "Choose your new password",
+    "Nouveau mot de passe (6 caractères min.)": "New password (min. 6 characters)", "Enregistrer": "Save",
+    "Compte gratuit : 5 vérifications TVA, 5 validations IBAN et 2 opérations PDF offertes chaque mois": "Free account: 5 VAT checks, 5 IBAN validations and 2 PDF operations included every month",
+    "Mensuel": "Monthly", "Annuel": "Yearly", "⭐ 2 MOIS OFFERTS": "⭐ 2 MONTHS FREE",
+    "Souplesse maximale, sans engagement": "Maximum flexibility, no commitment",
+    "— soit 4,08 €/mois": "— i.e. €4.08/month",
+    "✅ Vérifications TVA (VIES + BCE)": "✅ VAT checks (VIES + CBE)",
+    "illimitées": "unlimited", "illimités": "unlimited",
+    "✅ Validations IBAN / BIC": "✅ IBAN / BIC validations", "✅ Outils PDF": "✅ PDF tools",
+    "(division, fusion, Word, OCR)": "(split, merge, Word, OCR)",
+    "✅ Conversion Word haute fidélité": "✅ High-fidelity Word conversion",
+    "✅ Sans engagement — annulable en ligne": "✅ No commitment — cancel online",
+    "➕ Le meilleur prix garanti à l'année": "➕ Best yearly price guaranteed",
+    "Choisir Mensuel →": "Choose Monthly →", "Choisir Annuel →": "Choose Yearly →",
+    "Se déconnecter": "Sign out", "Gérer mon abonnement (facture, annulation…)": "Manage my subscription (invoice, cancellation…)",
+    "Formule gratuite — il vous reste ce mois-ci :": "Free plan — remaining this month:",
+    "vérification(s) TVA ·": "VAT check(s) ·", "opération(s) PDF.": "PDF operation(s).",
+    "👤 Mon compte": "👤 My account", "Formule": "Plan",
+    "Compte gratuit requis": "Free account required",
+    "(10 secondes) : 5 vérifications TVA, 5 validations IBAN et 2 opérations PDF offertes chaque mois.": "(10 seconds): 5 VAT checks, 5 IBAN validations and 2 PDF operations free every month.",
+    "Créer mon compte / me connecter": "Create account / sign in",
+    "Quota gratuit du mois épuisé.": "Free monthly quota used up.", "Passez en illimité :": "Go unlimited:",
+    "ou": "or", "S'abonner": "Subscribe", "4,99 € / mois": "€4.99 / month", "49 € / an": "€49 / year",
+    "✓ NUMÉRO VALIDE": "✓ VALID NUMBER", "✗ NUMÉRO INVALIDE": "✗ INVALID NUMBER",
+    "✓ IBAN VALIDE": "✓ VALID IBAN", "✗ IBAN INVALIDE": "✗ INVALID IBAN",
+    "✓ Calcul effectué": "✓ Calculation done", "copier": "copy",
+    "Dénomination": "Name", "Adresse": "Address", "Numéro": "Number", "Pays": "Country",
+    "Code banque": "Bank code", "Banque": "Bank", "Nombre de jours": "Number of days", "Prix par jour": "Price per day",
+  },
+};
+
+const HINTS = {
+  nl: {
+    hint_tva: "Voer het nummer in met de landcode, bv. <b>BE0403199702</b>, <b>FR40303265045</b>, <b>NL810433941B01</b>. Dekking: <b>de 27 EU-landen</b> (officiële VIES-raadpleging, Europese Commissie), Noord-Ierland (<b>XI</b>) en het Verenigd Koninkrijk (<b>GB</b>: formaatcontrole + link naar gov.uk). Het formaat wordt per land gecontroleerd. Voor Belgische nummers worden de publieke KBO-gegevens extra opgehaald.",
+    hint_iban: "<b>Alle IBAN-landen worden aanvaard</b> (heel Europa en verder, ~85 landen): officiële lengte per land, internationale modulo 97-controle, plus de Belgische en Franse (RIB) nationale controles. BIC en banknaam worden automatisch opgezocht waar mogelijk (BE, DE, NL, LU, AT, LI…).",
+    hint_split: "Kies een PDF: de pagina's verschijnen als miniaturen. <b>Klik</b> op de eerste pagina van een document (begin) en daarna op de laatste (einde) — herhaal per document. Elk klikpaar = één apart PDF-bestand. <b>Privacy:</b> alles gebeurt in uw browser.",
+    hint_merge: "Meerdere PDF's samenvoegen tot één, in de volgorde van uw keuze.",
+    hint_word: "Volledige conversie naar <b>.docx</b>: lay-out, logo's/afbeeldingen, kolommen en tabellen worden gereconstrueerd (pdf2docx-engine). Bij een <b>gescande</b> PDF start de OCR <b>automatisch</b> vóór de conversie — één knop voor alles.",
+    hint_ocr: "Herkent tekst uit een gescande PDF of afbeelding (JPG, PNG). De eerste keer wordt de engine gedownload (~15 MB), daarna is het onmiddellijk. Alles blijft in uw browser.",
+    hint_prorata: "Periode en totaalbedrag → aantal dagen, prijs per dag en verdeling per kalenderjaar.",
+    hint_r3: "Een bedrag proportioneel verdelen: X is welk deel van Y, toegepast op Z?",
+    hint_ptva: "Omzet met recht op aftrek ÷ totale omzet — afgerond naar de <b>hogere</b> eenheid (art. 46 §1 Belgisch Btw-wetboek).",
+    footer_desc: "Btw-controle (VIES / KBO) · IBAN &amp; BIC · PDF-tools · Pro rata",
+    footer_privacy: "Uw PDF-documenten worden lokaal in uw browser verwerkt en nooit naar een server verstuurd.",
+  },
+  en: {
+    hint_tva: "Enter the number with its country code, e.g. <b>BE0403199702</b>, <b>FR40303265045</b>, <b>NL810433941B01</b>. Coverage: <b>all 27 EU countries</b> (official VIES lookup, European Commission), Northern Ireland (<b>XI</b>) and the United Kingdom (<b>GB</b>: format check + gov.uk link). The format is validated per country. For Belgian numbers, public CBE data is fetched as well.",
+    hint_iban: "<b>All IBAN countries are accepted</b> (all of Europe and beyond, ~85 countries): official country length, international modulo 97 check, plus Belgian and French (RIB) national checks. BIC and bank name are looked up automatically where possible (BE, DE, NL, LU, AT, LI…).",
+    hint_split: "Choose a PDF: its pages appear as thumbnails. <b>Click</b> the first page of a document (start), then its last page (end) — repeat for each document. Each pair of clicks = one separate PDF file. <b>Privacy:</b> everything happens in your browser.",
+    hint_merge: "Combine several PDFs into one, in the order of your choice.",
+    hint_word: "Full conversion to <b>.docx</b>: layout, logos/images, columns and tables are rebuilt (pdf2docx engine). If the PDF is a <b>scan</b>, OCR runs <b>automatically</b> before conversion — one button does it all.",
+    hint_ocr: "Recognises text from a scanned PDF or an image (JPG, PNG). The first run downloads the engine (~15 MB), then it's instant. Everything stays in your browser.",
+    hint_prorata: "Period and total amount → number of days, price per day and split per calendar year.",
+    hint_r3: "Distribute an amount proportionally: X is what share of Y, applied to Z?",
+    hint_ptva: "Turnover with deduction right ÷ total turnover — rounded <b>up</b> (art. 46 §1 Belgian VAT Code).",
+    footer_desc: "VAT check (VIES / CBE) · IBAN &amp; BIC · PDF tools · Pro rata",
+    footer_privacy: "Your PDF documents are processed locally in your browser and never sent to a server.",
+  },
+};
+
+let currentLang = localStorage.getItem("moc_lang") || "fr";
+
+function translateTextNode(n) {
+  const raw = n.nodeValue, t = raw.trim();
+  if (!t) return;
+  const src = n.__fr || t;
+  if (currentLang === "fr") {
+    if (n.__fr && t !== n.__fr) n.nodeValue = raw.replace(t, n.__fr);
+    return;
+  }
+  const tr = (I18N[currentLang] || {})[src];
+  if (tr && tr !== t) { n.__fr = src; n.nodeValue = raw.replace(t, tr); }
+  else if (n.__fr && !tr) { /* pas de traduction : on garde le texte courant */ }
+}
+
+function translateAll(root) {
+  const scope = root && root.querySelectorAll ? root : document.body;
+  const w = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
+  let n;
+  while ((n = w.nextNode())) translateTextNode(n);
+  const tagged = scope.querySelectorAll ? scope.querySelectorAll("[data-i18n]") : [];
+  tagged.forEach(el => {
+    const k = el.dataset.i18n;
+    if (!el.__frHtml) el.__frHtml = el.innerHTML;
+    el.innerHTML = currentLang === "fr" ? el.__frHtml : ((HINTS[currentLang] || {})[k] || el.__frHtml);
+  });
+}
+
+function setLang(lang) {
+  currentLang = lang;
+  localStorage.setItem("moc_lang", lang);
+  document.documentElement.lang = lang;
+  const sel = document.getElementById("lang-select");
+  if (sel) sel.value = lang;
+  translateAll();
+}
+
+// traduit automatiquement tout contenu ajouté dynamiquement (résultats, compte, tarifs…)
+new MutationObserver(muts => {
+  if (currentLang === "fr") return;
+  for (const m of muts) {
+    m.addedNodes.forEach(nd => {
+      if (nd.nodeType === 1) translateAll(nd);
+      else if (nd.nodeType === 3) translateTextNode(nd);
+    });
+  }
+}).observe(document.body, { childList: true, subtree: true });
 
 /* ---------- état serveur ---------- */
 async function ping() {
@@ -732,6 +962,7 @@ async function pdfQuota(resultId) {
 }
 
 initAuth();
+setLang(currentLang);
 
 const fmtEur = n => n.toLocaleString("fr-BE", { style: "currency", currency: "EUR" });
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
