@@ -81,6 +81,31 @@
   .badge { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: .8rem; font-weight: 700; }
   .badge.ok { background: var(--ok); color: #fff; }
   .badge.bad { background: var(--bad); color: #fff; }
+  .thumbs { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+  .thumb {
+    width: 114px; border: 2px solid var(--border); border-radius: 8px; background: #fff;
+    cursor: pointer; position: relative; padding: 4px; text-align: center;
+    transition: border-color .1s, box-shadow .1s;
+  }
+  .thumb:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(36,86,230,.25); }
+  .thumb canvas { max-width: 100%; display: block; margin: 0 auto; }
+  .thumb .num { font-size: .72rem; color: var(--muted); margin-top: 3px; display: block; }
+  .thumb .tag {
+    position: absolute; top: 2px; left: 2px; right: 2px; font-size: .66rem; font-weight: 700;
+    border-radius: 5px; padding: 2px 0; color: #fff; display: none;
+  }
+  .thumb.start { border-color: var(--ok); }
+  .thumb.start .tag { display: block; background: var(--ok); }
+  .thumb.end { border-color: var(--bad); }
+  .thumb.end .tag { display: block; background: var(--bad); }
+  .thumb.start.end .tag { background: linear-gradient(90deg, var(--ok), var(--bad)); }
+  .thumb.in { border-color: var(--ok); background: var(--ok-soft); }
+  .thumb.open { border-color: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
+  .rangechip {
+    display: inline-flex; align-items: center; gap: 6px; margin: 8px 8px 0 0; padding: 4px 10px;
+    background: var(--accent-soft); border: 1px solid #c9d7fb; border-radius: 999px; font-size: .82rem;
+  }
+  .rangechip button { border: none; background: none; cursor: pointer; color: var(--bad); font-weight: 700; }
   .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 12px; }
   @media (max-width: 640px) { .tiles { grid-template-columns: 1fr; } }
   .tile { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
@@ -193,13 +218,17 @@
 
   <div class="card">
     <h2>✂️ Diviser un PDF (Split)</h2>
-    <p class="hint">Extraire certaines pages, ou découper le document en un fichier par page.
+    <p class="hint">Choisissez un PDF : ses pages s'affichent en miniatures. <b>Cliquez</b> sur la première
+    page d'un document (début), puis sur sa dernière page (fin) — recommencez pour chaque document à créer.
+    Chaque paire de clics = un fichier PDF séparé.
     <b>Confidentialité :</b> tout se fait dans votre navigateur, le fichier n'est envoyé nulle part.</p>
     <label>Fichier PDF</label>
-    <input type="file" id="split-file" accept=".pdf,application/pdf">
-    <div class="row">
-      <div><label>Pages à extraire (ex. 1-3,5,8-10 — vide = toutes)</label><input id="split-ranges" placeholder="1-3,5"></div>
-      <div><label>Mode</label>
+    <input type="file" id="split-file" accept=".pdf,application/pdf" onchange="splitFileChanged()">
+    <div id="split-thumbs" class="thumbs"></div>
+    <div id="split-summary"></div>
+    <div class="row" style="margin-top:8px">
+      <div><label>Ou plages manuelles (ex. 1-3,5 — utilisées si aucun clic)</label><input id="split-ranges" placeholder="1-3,5"></div>
+      <div><label>Mode (si plages manuelles)</label>
         <select id="split-mode">
           <option value="one">Un seul PDF avec les pages choisies</option>
           <option value="each">Un fichier par page</option>
@@ -581,11 +610,110 @@ async function coreSplitEach(buffer, rangeStr) {
   return files;
 }
 
+/* --- sélection visuelle par miniatures --- */
+let splitState = { buf: null, name: "", numPages: 0, ranges: [], open: null };
+
+async function splitFileChanged() {
+  const f = document.getElementById("split-file").files[0];
+  if (!f) return;
+  hide("split-result");
+  document.getElementById("split-thumbs").innerHTML = "";
+  document.getElementById("split-summary").innerHTML = "";
+  show("split-result", "neutral", "⏳ Chargement des miniatures…");
+  try {
+    const buf = await f.arrayBuffer();
+    await splitLoadBuffer(buf, f.name);
+    hide("split-result");
+  } catch (e) { show("split-result", "bad", "❌ " + esc(e.message)); }
+}
+
+async function splitLoadBuffer(buf, name) {
+  await needPdfJs();
+  const pdf = await pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
+  splitState = { buf, name, numPages: pdf.numPages, ranges: [], open: null };
+  const cont = document.getElementById("split-thumbs");
+  cont.innerHTML = "";
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const vp0 = page.getViewport({ scale: 1 });
+    const vp = page.getViewport({ scale: 104 / vp0.width });
+    const canvas = document.createElement("canvas");
+    canvas.width = vp.width; canvas.height = vp.height;
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp, intent: "print" }).promise;
+    const div = document.createElement("div");
+    div.className = "thumb"; div.dataset.page = p;
+    div.innerHTML = `<span class="tag"></span>`;
+    div.appendChild(canvas);
+    div.insertAdjacentHTML("beforeend", `<span class="num">page ${p}</span>`);
+    div.onclick = () => splitClick(p);
+    cont.appendChild(div);
+  }
+  splitPaint();
+}
+
+function splitClick(p) {
+  const s = splitState;
+  if (s.open === null) {
+    // clic sur une page déjà dans un document : on retire ce document
+    const i = s.ranges.findIndex(r => p >= r.from && p <= r.to);
+    if (i >= 0) s.ranges.splice(i, 1);
+    else s.open = p;
+  } else {
+    let a = s.open, b = p;
+    if (b < a) [a, b] = [b, a];
+    s.ranges.push({ from: a, to: b });
+    s.ranges.sort((x, y) => x.from - y.from);
+    s.open = null;
+  }
+  splitPaint();
+}
+
+function splitRemoveRange(i) { splitState.ranges.splice(i, 1); splitPaint(); }
+function splitReset() { splitState.ranges = []; splitState.open = null; splitPaint(); }
+
+function splitPaint() {
+  const s = splitState;
+  document.querySelectorAll("#split-thumbs .thumb").forEach(div => {
+    const p = Number(div.dataset.page);
+    div.className = "thumb";
+    const tag = div.querySelector(".tag");
+    tag.textContent = "";
+    s.ranges.forEach((r, i) => {
+      if (p === r.from) { div.classList.add("start"); tag.textContent = `Doc ${i + 1} · début`; }
+      if (p === r.to) { div.classList.add("end"); tag.textContent = p === r.from ? `Doc ${i + 1}` : `Doc ${i + 1} · fin`; }
+      if (p > r.from && p < r.to) div.classList.add("in");
+    });
+    if (s.open === p) { div.classList.add("open"); tag.textContent = "Début… (cliquez la fin)"; tag.style.display = "block"; tag.style.background = "var(--warn)"; }
+    else tag.style.background = "";
+  });
+  const sum = document.getElementById("split-summary");
+  if (!s.ranges.length && s.open === null) { sum.innerHTML = ""; return; }
+  sum.innerHTML = s.ranges.map((r, i) =>
+    `<span class="rangechip">📄 Doc ${i + 1} : page${r.from === r.to ? ` ${r.from}` : `s ${r.from} à ${r.to}`}
+     <button onclick="splitRemoveRange(${i})" title="retirer">✕</button></span>`).join("")
+    + (s.open !== null ? `<span class="rangechip" style="background:var(--warn-soft)">⏳ Doc ${s.ranges.length + 1} : début page ${s.open} — cliquez sur la page de fin</span>` : "")
+    + `<span class="rangechip" style="cursor:pointer" onclick="splitReset()">🗑️ tout effacer</span>`;
+}
+
 async function uiSplit() {
   const f = document.getElementById("split-file").files[0];
   if (!f) return show("split-result", "bad", "Choisissez un fichier PDF.");
   show("split-result", "neutral", "⏳ Traitement en cours…");
   try {
+    const s = splitState;
+    // Mode visuel : des documents ont été définis par clics
+    if (s.buf && (s.ranges.length || s.open !== null)) {
+      const ranges = [...s.ranges];
+      if (s.open !== null) ranges.push({ from: s.open, to: s.open }); // début sans fin = une seule page
+      const nom = baseName(f);
+      for (let i = 0; i < ranges.length; i++) {
+        const r = await coreSplit(s.buf.slice(0), `${ranges[i].from}-${ranges[i].to}`);
+        download(r.bytes, `${nom}_doc${i + 1}.pdf`, "application/pdf");
+        await new Promise(rs => setTimeout(rs, 350));
+      }
+      return show("split-result", "ok", `✅ <b>${ranges.length} document(s)</b> téléchargé(s) : ${ranges.map((r, i) => `doc${i + 1} (p. ${r.from}${r.to !== r.from ? "-" + r.to : ""})`).join(", ")}.<br>Si le navigateur demande l'autorisation de « télécharger plusieurs fichiers », acceptez.`);
+    }
+    // Mode manuel (champ texte)
     const buf = await f.arrayBuffer();
     const ranges = document.getElementById("split-ranges").value;
     if (document.getElementById("split-mode").value === "one") {
@@ -596,7 +724,7 @@ async function uiSplit() {
       const files = await coreSplitEach(buf, ranges);
       for (const x of files) {
         download(x.bytes, `${baseName(f)}_page_${x.page}.pdf`, "application/pdf");
-        await new Promise(r => setTimeout(r, 350)); // laisse le navigateur enchaîner les téléchargements
+        await new Promise(r => setTimeout(r, 350));
       }
       show("split-result", "ok", `✅ <b>${files.length} fichier(s)</b> téléchargé(s) (un par page). Si le navigateur demande l'autorisation de « télécharger plusieurs fichiers », acceptez.`);
     }
