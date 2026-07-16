@@ -127,6 +127,7 @@
   <h1>🧮 MonOutilCompta <span style="opacity:.7;font-weight:400">— MOC</span></h1>
   <p>Prorata · Vérification TVA (VIES / BCE) · Validation IBAN &amp; BIC · Outils PDF</p>
   <span id="status"><span class="dot"></span><span id="statusTxt">Connexion au serveur…</span></span>
+  <span id="acct-chip" style="display:inline-flex;align-items:center;gap:7px;margin:10px 0 0 8px;background:rgba(255,255,255,.14);padding:4px 14px;border-radius:999px;font-size:.8rem;cursor:pointer" onclick="goTab('compte')">👤 …</span>
 </header>
 
 <nav>
@@ -134,6 +135,7 @@
   <button data-tab="iban">🏦 IBAN / BIC</button>
   <button data-tab="pdf">📄 PDF</button>
   <button data-tab="prorata">📐 Prorata</button>
+  <button data-tab="compte">👤 Compte</button>
 </nav>
 
 <main>
@@ -210,6 +212,14 @@
     <input id="iban-num" placeholder="BE68 5390 0754 7034" onkeydown="if(event.key==='Enter')checkIban()">
     <button class="btn" id="iban-btn" onclick="checkIban()">Valider</button>
     <div class="result" id="iban-result"></div>
+  </div>
+</section>
+
+<!-- ============ COMPTE ============ -->
+<section id="tab-compte">
+  <div class="card" id="compte-card">
+    <h2>👤 Mon compte</h2>
+    <p class="hint">Chargement…</p>
   </div>
 </section>
 
@@ -310,6 +320,180 @@ async function ping() {
   } catch { el.className = "off"; txt.textContent = "Serveur injoignable"; }
 }
 ping(); setInterval(ping, 15000);
+
+function goTab(name) {
+  const b = document.querySelector(`nav button[data-tab="${name}"]`);
+  if (b) b.click();
+}
+
+/* ---------- compte / abonnement ---------- */
+let sb = null, me = null, siteCfg = null;
+
+async function initAuth() {
+  try {
+    siteCfg = await (await fetch("/api/config")).json();
+    await loadScript("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js");
+    sb = window.supabase.createClient(siteCfg.supabaseUrl, siteCfg.supabaseAnonKey);
+    sb.auth.onAuthStateChange(() => refreshMe());
+    await refreshMe();
+    const p = new URLSearchParams(location.search);
+    if (p.get("abonnement") === "ok") { goTab("compte"); }
+  } catch (e) {
+    document.getElementById("acct-chip").textContent = "👤 hors ligne";
+  }
+}
+
+async function getToken() {
+  if (!sb) return null;
+  const { data } = await sb.auth.getSession();
+  return data.session ? data.session.access_token : null;
+}
+
+async function authFetch(url, opts = {}) {
+  const t = await getToken();
+  opts.headers = { ...(opts.headers || {}), ...(t ? { Authorization: "Bearer " + t } : {}) };
+  return fetch(url, opts);
+}
+
+async function refreshMe() {
+  const t = await getToken();
+  me = null;
+  if (t) {
+    try { const r = await authFetch("/api/me"); if (r.ok) me = await r.json(); } catch {}
+  }
+  renderChip(); renderAccount();
+}
+
+function renderChip() {
+  const c = document.getElementById("acct-chip");
+  if (me && me.authenticated) {
+    c.innerHTML = me.subscribed ? "⭐ " + esc(me.email) : "👤 " + esc(me.email) + " (gratuit)";
+  } else {
+    c.textContent = "👤 Se connecter / créer un compte";
+  }
+}
+
+const AUTH_ERRORS = {
+  "Invalid login credentials": "E-mail ou mot de passe incorrect.",
+  "Email not confirmed": "E-mail non confirmé : cliquez sur le lien reçu par e-mail.",
+  "User already registered": "Un compte existe déjà avec cet e-mail.",
+  "Password should be at least 6 characters.": "Le mot de passe doit faire au moins 6 caractères.",
+};
+const frAuthError = m => AUTH_ERRORS[m] || m;
+
+function acctMsg(cls, html) {
+  const el = document.getElementById("acct-msg");
+  if (el) { el.className = "result show " + cls; el.innerHTML = html; }
+}
+
+function renderAccount() {
+  const card = document.getElementById("compte-card");
+  if (!card) return;
+  if (!me || !me.authenticated) {
+    card.innerHTML = `
+      <h2>👤 Mon compte</h2>
+      <p class="hint">Créez un compte <b>gratuit</b> : ${QUOTA_TEXTE} chaque mois.
+      Pour un usage illimité : <b>${siteCfg ? siteCfg.prices.monthly : "4,99 € / mois"}</b> ou <b>${siteCfg ? siteCfg.prices.yearly : "49 € / an"}</b> (2 mois offerts).</p>
+      <div class="row">
+        <div><label>E-mail</label><input id="acct-email" type="email" placeholder="vous@exemple.be"></div>
+        <div><label>Mot de passe (6 caractères min.)</label><input id="acct-pass" type="password" onkeydown="if(event.key==='Enter')acctLogin()"></div>
+      </div>
+      <div class="row">
+        <button class="btn" onclick="acctLogin()">Se connecter</button>
+        <button class="btn" style="background:#fff;color:var(--accent);border:2px solid var(--accent)" onclick="acctSignup()">Créer mon compte gratuit</button>
+      </div>
+      <div class="result" id="acct-msg"></div>`;
+    return;
+  }
+  const q = me.quotas || {};
+  const qline = (label, o) => o ? `<span class="k">${label}</span><span class="v">${Math.max(0, o.limit - o.used)} restant(s) sur ${o.limit}</span>` : "";
+  card.innerHTML = `
+    <h2>👤 Mon compte</h2>
+    <div class="kv" style="margin-top:6px">
+      <span class="k">E-mail</span><span class="v">${esc(me.email)}</span>
+      <span class="k">Formule</span><span class="v">${me.subscribed
+        ? `⭐ Abonné ${me.plan === "yearly" ? "annuel" : "mensuel"} — illimité${me.period_end ? " jusqu'au " + new Date(me.period_end).toLocaleDateString("fr-BE") : ""}`
+        : "Gratuite (quotas mensuels)"}</span>
+      ${me.subscribed ? "" : qline("Vérifications TVA", q.vat) + qline("Validations IBAN", q.iban) + qline("Opérations PDF", q.pdf)}
+    </div>
+    ${me.subscribed ? `
+      <button class="btn" style="margin-top:18px" onclick="acctPortal()">Gérer mon abonnement (facture, annulation…)</button>
+    ` : `
+      <p class="hint" style="margin-top:18px"><b>Passez en illimité :</b></p>
+      <div class="row">
+        <button class="btn" onclick="acctSubscribe('monthly')">⭐ ${siteCfg ? siteCfg.prices.monthly : "4,99 € / mois"}</button>
+        <button class="btn" onclick="acctSubscribe('yearly')">⭐ ${siteCfg ? siteCfg.prices.yearly : "49 € / an"} <small>(2 mois offerts)</small></button>
+      </div>
+      ${siteCfg && !siteCfg.billingReady ? '<p class="hint" style="margin-top:8px">⚠️ Paiements en cours d\'activation — réessayez bientôt.</p>' : ""}
+    `}
+    <button class="btn" style="margin-top:10px;background:#fff;color:var(--muted);border:1px solid var(--border)" onclick="acctLogout()">Se déconnecter</button>
+    <div class="result" id="acct-msg"></div>`;
+}
+
+const QUOTA_TEXTE = "5 vérifications TVA, 5 validations IBAN et 2 opérations PDF offertes";
+
+async function acctLogin() {
+  const { error } = await sb.auth.signInWithPassword({
+    email: document.getElementById("acct-email").value.trim(),
+    password: document.getElementById("acct-pass").value,
+  });
+  if (error) acctMsg("bad", "❌ " + esc(frAuthError(error.message)));
+}
+
+async function acctSignup() {
+  const email = document.getElementById("acct-email").value.trim();
+  const password = document.getElementById("acct-pass").value;
+  if (!email || !password) return acctMsg("bad", "Indiquez un e-mail et un mot de passe.");
+  const { error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin } });
+  if (error) return acctMsg("bad", "❌ " + esc(frAuthError(error.message)));
+  acctMsg("ok", "✅ Compte créé ! Un e-mail de confirmation vient de vous être envoyé — cliquez sur le lien, puis connectez-vous ici.");
+}
+
+async function acctLogout() { await sb.auth.signOut(); }
+
+async function acctSubscribe(plan) {
+  acctMsg("neutral", "⏳ Préparation du paiement sécurisé…");
+  const r = await authFetch("/api/billing/checkout", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ plan }),
+  });
+  const d = await r.json();
+  if (d.url) location.href = d.url;
+  else acctMsg("bad", "❌ " + esc(d.error || "Erreur de paiement"));
+}
+
+async function acctPortal() {
+  const r = await authFetch("/api/billing/portal", { method: "POST" });
+  const d = await r.json();
+  if (d.url) location.href = d.url;
+  else acctMsg("bad", "❌ " + esc(d.error || "Erreur"));
+}
+
+// Gestion des refus 401/402 sur les outils
+function quotaBlocked(resp, resultId) {
+  if (resp.status === 401) {
+    show(resultId, "warn", `🔒 <b>Compte gratuit requis</b> (10 secondes) : ${QUOTA_TEXTE} chaque mois.
+      <a href="#" onclick="goTab('compte');return false">Créer mon compte / me connecter</a>`);
+    return true;
+  }
+  if (resp.status === 402) {
+    show(resultId, "warn", `⭐ <b>Quota gratuit du mois épuisé.</b> Passez en illimité :
+      <b>${siteCfg ? siteCfg.prices.monthly : "4,99 € / mois"}</b> ou <b>${siteCfg ? siteCfg.prices.yearly : "49 € / an"}</b>.
+      <a href="#" onclick="goTab('compte');return false">S'abonner</a>`);
+    return true;
+  }
+  return false;
+}
+
+// Consommation d'une opération PDF (outils navigateur)
+async function pdfQuota(resultId) {
+  const r = await authFetch("/api/quota/pdf", { method: "POST" });
+  if (r.ok) { refreshMe(); return true; }
+  quotaBlocked(r, resultId);
+  return false;
+}
+
+initAuth();
 
 const fmtEur = n => n.toLocaleString("fr-BE", { style: "currency", currency: "EUR" });
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -449,8 +633,10 @@ async function checkTva() {
   btn.disabled = true; btn.textContent = "Interrogation de VIES…";
   show("tva-result", "neutral", "⏳ Consultation du service VIES de la Commission européenne…");
   try {
-    const r = await fetch(`/api/vies/${raw.slice(0, 2)}/${raw.slice(2)}`);
+    const r = await authFetch(`/api/vies/${raw.slice(0, 2)}/${raw.slice(2)}`);
+    if (quotaBlocked(r, "tva-result")) return;
     const d = await r.json();
+    refreshMe();
     if (d.error && d.valid !== false) {
       show("tva-result", "warn", "⚠️ " + esc(d.error) +
         (d.manualUrl ? ` <a href="${esc(d.manualUrl)}" target="_blank" rel="noopener">Vérifier sur gov.uk ↗</a>` : ""));
@@ -518,8 +704,10 @@ async function checkIban() {
   btn.disabled = true; btn.textContent = "Validation…";
   show("iban-result", "neutral", "⏳ Validation en cours…");
   try {
-    const r = await fetch(`/api/iban/${encodeURIComponent(raw.replace(/\s/g, ""))}`);
+    const r = await authFetch(`/api/iban/${encodeURIComponent(raw.replace(/\s/g, ""))}`);
+    if (quotaBlocked(r, "iban-result")) return;
     const d = await r.json();
+    refreshMe();
     const checks = `<ul class="checks">${(d.checks || []).map(c => `<li>${c.ok ? "✅" : "❌"} ${esc(c.label)}</li>`).join("")}</ul>`;
     if (!d.valid) {
       show("iban-result", "bad", `<h3><span class="badge bad">✗ IBAN INVALIDE</span></h3>${checks}`);
@@ -698,6 +886,7 @@ function splitPaint() {
 async function uiSplit() {
   const f = document.getElementById("split-file").files[0];
   if (!f) return show("split-result", "bad", "Choisissez un fichier PDF.");
+  if (!(await pdfQuota("split-result"))) return;
   show("split-result", "neutral", "⏳ Traitement en cours…");
   try {
     const s = splitState;
@@ -764,6 +953,7 @@ async function coreMerge(buffers) {
 
 async function uiMerge() {
   if (mergeOrder.length < 2) return show("merge-result", "bad", "Sélectionnez au moins deux fichiers PDF.");
+  if (!(await pdfQuota("merge-result"))) return;
   show("merge-result", "neutral", "⏳ Fusion en cours…");
   try {
     const buffers = [];
@@ -871,7 +1061,9 @@ async function uiToWord() {
       ocrFait = true;
     }
     prog("Conversion Word haute fidélité en cours…");
-    const resp = await fetch("/api/pdf2word", { method: "POST", body: buf });
+    const resp = await authFetch("/api/pdf2word", { method: "POST", body: buf });
+    if (quotaBlocked(resp, "word-result")) return;
+    refreshMe();
     if (resp.ok) {
       const docx = await resp.arrayBuffer();
       download(docx, `${baseName(f)}.docx`, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
@@ -892,6 +1084,7 @@ async function uiOcr() {
   const f = document.getElementById("ocr-file").files[0];
   if (!f) return show("ocr-result", "bad", "Choisissez un PDF ou une image.");
   const lang = document.getElementById("ocr-lang").value;
+  if (!(await pdfQuota("ocr-result"))) return;
   const prog = m => show("ocr-result", "neutral", "⏳ " + esc(m));
   try {
     prog("Chargement du moteur OCR (première fois : ~15 Mo)…");

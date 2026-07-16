@@ -16,6 +16,18 @@ const zlib = require("node:zlib");
 const { execFile } = require("node:child_process");
 
 const PYTHON = process.platform === "win32" ? "python" : "python3";
+const billing = require("./billing.js");
+
+// 401 = compte requis, 402 = quota gratuit épuisé
+function sendQuotaError(res, q) {
+  if (q.reason === "auth") {
+    return sendJson(res, 401, { code: "AUTH_REQUIRED", error: "Créez un compte gratuit pour utiliser cet outil." });
+  }
+  if (q.reason === "quota") {
+    return sendJson(res, 402, { code: "QUOTA_EXCEEDED", used: q.used, limit: q.limit, error: "Quota gratuit du mois épuisé — passez en illimité." });
+  }
+  return sendJson(res, 503, { error: "Vérification du compte impossible : " + (q.error || "réessayez") });
+}
 
 const PORT = Number(process.env.PORT) || 3001; // PORT est fourni par l'hébergeur en ligne (Render, Railway…)
 const ROOT = __dirname;
@@ -88,7 +100,9 @@ function sendJson(res, status, obj) {
 
 /* ---------- TVA / VIES ---------- */
 
-async function handleVies(res, country, vatNumber) {
+async function handleVies(req, res, country, vatNumber) {
+  const q = await billing.consumeQuota(req, "vat");
+  if (!q.allowed) return sendQuotaError(res, q);
   let cc = String(country || "").toUpperCase().replace(/[^A-Z]/g, "");
   const num = String(vatNumber || "").replace(/[^0-9A-Za-z]/g, "");
   if (!/^[A-Z]{2}$/.test(cc) || num.length < 2) {
@@ -247,7 +261,9 @@ function ibanChecksumValid(iban) {
   return remainder === 1;
 }
 
-async function handleIban(res, rawIban) {
+async function handleIban(req, res, rawIban) {
+  const q = await billing.consumeQuota(req, "iban");
+  if (!q.allowed) return sendQuotaError(res, q);
   const iban = String(rawIban || "").replace(/[\s.-]/g, "").toUpperCase();
   const result = {
     iban,
@@ -353,6 +369,8 @@ function readBody(req, maxBytes = 100 * 1024 * 1024) {
 }
 
 async function handlePdf2Word(req, res) {
+  const q = await billing.consumeQuota(req, "pdf");
+  if (!q.allowed) return sendQuotaError(res, q);
   let pdfBuf;
   try {
     pdfBuf = await readBody(req);
@@ -406,9 +424,37 @@ const server = http.createServer(async (req, res) => {
   try {
     if (parts[0] === "api") {
       if (parts[1] === "health") return sendJson(res, 200, { ok: true, time: new Date().toISOString() });
-      if (parts[1] === "vies" && parts.length === 4) return await handleVies(res, parts[2], parts[3]);
+      if (parts[1] === "config") {
+        return sendJson(res, 200, {
+          supabaseUrl: billing.SUPABASE_URL,
+          supabaseAnonKey: billing.SUPABASE_ANON_KEY,
+          prices: { monthly: billing.PRICES.monthly.label, yearly: billing.PRICES.yearly.label },
+          billingReady: billing.STRIPE_READY,
+        });
+      }
+      if (parts[1] === "me") return sendJson(res, 200, await billing.accountStatus(req));
+      if (parts[1] === "quota" && parts[2] === "pdf" && req.method === "POST") {
+        const q = await billing.consumeQuota(req, "pdf");
+        if (!q.allowed) return sendQuotaError(res, q);
+        return sendJson(res, 200, q);
+      }
+      if (parts[1] === "billing" && parts[2] === "checkout" && req.method === "POST") {
+        const body = JSON.parse((await readBody(req, 10240)).toString() || "{}");
+        const r = await billing.createCheckout(req, body.plan);
+        return sendJson(res, r.status, r.body);
+      }
+      if (parts[1] === "billing" && parts[2] === "portal" && req.method === "POST") {
+        const r = await billing.createPortal(req);
+        return sendJson(res, r.status, r.body);
+      }
+      if (parts[1] === "stripe" && parts[2] === "webhook" && req.method === "POST") {
+        const raw = await readBody(req, 1024 * 1024);
+        const r = await billing.handleWebhook(req, raw);
+        return sendJson(res, r.status, r.body);
+      }
+      if (parts[1] === "vies" && parts.length === 4) return await handleVies(req, res, parts[2], parts[3]);
       if (parts[1] === "bce" && parts.length === 3) return await handleBce(res, parts[2]);
-      if (parts[1] === "iban" && parts.length === 3) return await handleIban(res, parts[2]);
+      if (parts[1] === "iban" && parts.length === 3) return await handleIban(req, res, parts[2]);
       if (parts[1] === "pdf2word" && req.method === "POST") return await handlePdf2Word(req, res);
       return sendJson(res, 404, { error: "Route API inconnue" });
     }
