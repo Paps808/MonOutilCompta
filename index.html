@@ -130,16 +130,16 @@
 </header>
 
 <nav>
-  <button class="active" data-tab="prorata">📐 Prorata</button>
-  <button data-tab="tva">🏢 Vérification TVA</button>
+  <button class="active" data-tab="tva">🏢 Vérification TVA</button>
   <button data-tab="iban">🏦 IBAN / BIC</button>
   <button data-tab="pdf">📄 PDF</button>
+  <button data-tab="prorata">📐 Prorata</button>
 </nav>
 
 <main>
 
 <!-- ============ PRORATA ============ -->
-<section id="tab-prorata" class="active">
+<section id="tab-prorata">
 
   <div class="card">
     <h2>Calcul de prorata</h2>
@@ -183,7 +183,7 @@
 </section>
 
 <!-- ============ TVA ============ -->
-<section id="tab-tva">
+<section id="tab-tva" class="active">
   <div class="card">
     <h2>Vérification d'un numéro de TVA européen (VIES)</h2>
     <p class="hint">Saisissez le numéro avec le code pays, ex. <b>BE0403199702</b>, <b>FR40303265045</b>, <b>NL810433941B01</b>.
