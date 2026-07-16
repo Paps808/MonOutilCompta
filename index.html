@@ -477,7 +477,7 @@ const I18N = {
     "Envoyer le lien": "Link versturen", "← Retour à la connexion": "← Terug naar inloggen",
     "Nouveau mot de passe": "Nieuw wachtwoord", "Choisissez votre nouveau mot de passe": "Kies uw nieuw wachtwoord",
     "Nouveau mot de passe (6 caractères min.)": "Nieuw wachtwoord (min. 6 tekens)", "Enregistrer": "Opslaan",
-    "Compte gratuit : 5 vérifications TVA, 5 validations IBAN et 2 opérations PDF offertes chaque mois": "Gratis account: elke maand 5 btw-controles, 5 IBAN-validaties en 2 PDF-bewerkingen inbegrepen",
+    "Créez votre compte MonOutilCompta": "Maak uw MonOutilCompta-account aan",
     "Mensuel": "Maandelijks", "Annuel": "Jaarlijks", "⭐ 2 MOIS OFFERTS": "⭐ 2 MAANDEN GRATIS",
     "Souplesse maximale, sans engagement": "Maximale flexibiliteit, zonder verbintenis",
     "— soit 4,08 €/mois": "— d.w.z. 4,08 €/maand",
@@ -493,11 +493,10 @@ const I18N = {
     "Formule gratuite — il vous reste ce mois-ci :": "Gratis formule — deze maand nog beschikbaar:",
     "vérification(s) TVA ·": "btw-controle(s) ·", "opération(s) PDF.": "PDF-bewerking(en).",
     "👤 Mon compte": "👤 Mijn account", "Formule": "Formule",
-    "Compte gratuit requis": "Gratis account vereist",
-    "(10 secondes) : 5 vérifications TVA, 5 validations IBAN et 2 opérations PDF offertes chaque mois.": "(10 seconden): elke maand 5 btw-controles, 5 IBAN-validaties en 2 PDF-bewerkingen gratis.",
-    "Créer mon compte / me connecter": "Account aanmaken / inloggen",
-    "Quota gratuit du mois épuisé.": "Gratis maandquotum opgebruikt.", "Passez en illimité :": "Ga onbeperkt:",
-    "ou": "of", "S'abonner": "Abonneren", "4,99 € / mois": "4,99 € / maand", "49 € / an": "49 € / jaar",
+    "🔒 Connectez-vous pour utiliser cet outil.": "🔒 Log in om deze tool te gebruiken.",
+    "Se connecter / créer un compte": "Inloggen / account aanmaken",
+    "Votre quota gratuit du mois est atteint.": "Uw gratis maandquotum is bereikt.",
+    "Voir les formules": "Bekijk de formules",
     "✓ NUMÉRO VALIDE": "✓ GELDIG NUMMER", "✗ NUMÉRO INVALIDE": "✗ ONGELDIG NUMMER",
     "✓ IBAN VALIDE": "✓ GELDIGE IBAN", "✗ IBAN INVALIDE": "✗ ONGELDIGE IBAN",
     "✓ Calcul effectué": "✓ Berekening uitgevoerd", "copier": "kopiëren",
@@ -547,7 +546,7 @@ const I18N = {
     "Envoyer le lien": "Send link", "← Retour à la connexion": "← Back to sign in",
     "Nouveau mot de passe": "New password", "Choisissez votre nouveau mot de passe": "Choose your new password",
     "Nouveau mot de passe (6 caractères min.)": "New password (min. 6 characters)", "Enregistrer": "Save",
-    "Compte gratuit : 5 vérifications TVA, 5 validations IBAN et 2 opérations PDF offertes chaque mois": "Free account: 5 VAT checks, 5 IBAN validations and 2 PDF operations included every month",
+    "Créez votre compte MonOutilCompta": "Create your MonOutilCompta account",
     "Mensuel": "Monthly", "Annuel": "Yearly", "⭐ 2 MOIS OFFERTS": "⭐ 2 MONTHS FREE",
     "Souplesse maximale, sans engagement": "Maximum flexibility, no commitment",
     "— soit 4,08 €/mois": "— i.e. €4.08/month",
@@ -563,11 +562,10 @@ const I18N = {
     "Formule gratuite — il vous reste ce mois-ci :": "Free plan — remaining this month:",
     "vérification(s) TVA ·": "VAT check(s) ·", "opération(s) PDF.": "PDF operation(s).",
     "👤 Mon compte": "👤 My account", "Formule": "Plan",
-    "Compte gratuit requis": "Free account required",
-    "(10 secondes) : 5 vérifications TVA, 5 validations IBAN et 2 opérations PDF offertes chaque mois.": "(10 seconds): 5 VAT checks, 5 IBAN validations and 2 PDF operations free every month.",
-    "Créer mon compte / me connecter": "Create account / sign in",
-    "Quota gratuit du mois épuisé.": "Free monthly quota used up.", "Passez en illimité :": "Go unlimited:",
-    "ou": "or", "S'abonner": "Subscribe", "4,99 € / mois": "€4.99 / month", "49 € / an": "€49 / year",
+    "🔒 Connectez-vous pour utiliser cet outil.": "🔒 Sign in to use this tool.",
+    "Se connecter / créer un compte": "Sign in / create an account",
+    "Votre quota gratuit du mois est atteint.": "Your free monthly quota has been reached.",
+    "Voir les formules": "See plans",
     "✓ NUMÉRO VALIDE": "✓ VALID NUMBER", "✗ NUMÉRO INVALIDE": "✗ INVALID NUMBER",
     "✓ IBAN VALIDE": "✓ VALID IBAN", "✗ IBAN INVALIDE": "✗ INVALID IBAN",
     "✓ Calcul effectué": "✓ Calculation done", "copier": "copy",
@@ -762,7 +760,7 @@ function renderAccount() {
       signup: `
         <div class="auth-logo">🧮</div>
         <h2>Inscription</h2>
-        <p class="sub">Compte gratuit : ${QUOTA_TEXTE} chaque mois</p>
+        <p class="sub">Créez votre compte MonOutilCompta</p>
         <label>Adresse e-mail</label>
         <input id="acct-email" type="email" autocomplete="email" placeholder="vous@exemple.be">
         <label>Mot de passe (6 caractères min.)</label>
@@ -865,7 +863,6 @@ function renderAccount() {
     <div class="result" id="acct-msg"></div>`;
 }
 
-const QUOTA_TEXTE = "5 vérifications TVA, 5 validations IBAN et 2 opérations PDF offertes";
 
 function rebuildClient(storage) {
   sb = window.supabase.createClient(siteCfg.supabaseUrl, siteCfg.supabaseAnonKey, { auth: { storage } });
@@ -940,14 +937,13 @@ async function acctPortal() {
 // Gestion des refus 401/402 sur les outils
 function quotaBlocked(resp, resultId) {
   if (resp.status === 401) {
-    show(resultId, "warn", `🔒 <b>Compte gratuit requis</b> (10 secondes) : ${QUOTA_TEXTE} chaque mois.
-      <a href="#" onclick="goTab('compte');return false">Créer mon compte / me connecter</a>`);
+    show(resultId, "warn", `🔒 Connectez-vous pour utiliser cet outil.
+      <a href="#" onclick="goTab('compte');return false">Se connecter / créer un compte</a>`);
     return true;
   }
   if (resp.status === 402) {
-    show(resultId, "warn", `⭐ <b>Quota gratuit du mois épuisé.</b> Passez en illimité :
-      <b>${siteCfg ? siteCfg.prices.monthly : "4,99 € / mois"}</b> ou <b>${siteCfg ? siteCfg.prices.yearly : "49 € / an"}</b>.
-      <a href="#" onclick="goTab('compte');return false">S'abonner</a>`);
+    show(resultId, "warn", `Votre quota gratuit du mois est atteint.
+      <a href="#" onclick="goTab('compte');return false">Voir les formules</a>`);
     return true;
   }
   return false;
