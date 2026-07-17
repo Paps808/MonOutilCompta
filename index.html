@@ -189,6 +189,16 @@
   table.data tr:hover td { background: #101016; }
   table.data td.num { font-variant-numeric: tabular-nums; text-align: right; }
 
+  /* ---- convertisseur de devises (style OANDA) ---- */
+  .conv-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: end; margin-top: 6px; }
+  @media (max-width: 700px) { .conv-grid { grid-template-columns: 1fr; } .conv-grid .trad-swap { transform: rotate(90deg); margin: 0 auto; } }
+  .conv-amount {
+    margin-top: 8px; font-size: 1.35rem !important; font-weight: 700;
+    font-variant-numeric: tabular-nums; text-align: right;
+  }
+  .conv-tables { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 640px) { .conv-tables { grid-template-columns: 1fr; } }
+
   /* ---- traduction (style DeepL) ---- */
   .trad-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: stretch; margin-top: 6px; }
   @media (max-width: 700px) { .trad-grid { grid-template-columns: 1fr; } .trad-swap { transform: rotate(90deg); margin: 0 auto; } }
@@ -286,6 +296,7 @@
   <nav>
     <button class="active" data-tab="tva">Vérification TVA</button>
     <button data-tab="iban">IBAN / BIC</button>
+    <button data-tab="devises">Devises</button>
     <button data-tab="pdf">Outils PDF</button>
     <button data-tab="trad">Traduction</button>
     <button data-tab="prorata">Prorata</button>
@@ -362,14 +373,6 @@
 <!-- ============ IBAN ============ -->
 <section id="tab-iban">
 
-  <div class="subnav">
-    <button class="active" data-sub="valid" onclick="goSub('valid')">🏦 Validation IBAN / BIC</button>
-    <button data-sub="convert" onclick="goSub('convert')">💱 Convertisseur de devises</button>
-    <button data-sub="taux" onclick="goSub('taux')">📈 Taux BCE en direct</button>
-    <button data-sub="codes" onclick="goSub('codes')">🌍 Codes devises par pays</button>
-  </div>
-
-  <div class="subpane active" id="sub-valid">
   <div class="card">
     <h2>Validation IBAN &amp; identification de la banque (BIC)</h2>
     <p class="hint" data-i18n="hint_iban"><b>Tous les pays IBAN sont acceptés</b> (toute l'Europe et au-delà, ~85 pays) :
@@ -380,51 +383,54 @@
     <button class="btn" id="iban-btn" onclick="checkIban()">Valider</button>
     <div class="result" id="iban-result"></div>
   </div>
-  </div>
+</section>
 
-  <!-- Convertisseur de devises -->
-  <div class="subpane" id="sub-convert">
-    <div class="card">
-      <h2>💱 Convertisseur de devises</h2>
-      <p class="hint">Taux de référence officiels de la <b>Banque centrale européenne</b>. Convertissez au taux
-      du jour ou au taux d'une date passée (utile pour la comptabilité et les factures en devises).</p>
-      <div class="row3">
-        <div><label>Montant</label><input type="number" id="cv-montant" step="any" value="100"></div>
-        <div><label>De</label><select id="cv-de"></select></div>
-        <div><label>Vers</label><select id="cv-vers"></select></div>
+<!-- ============ DEVISES ============ -->
+<section id="tab-devises">
+
+  <div class="card">
+    <h2 id="cv-titre">💱 Convertisseur de devises</h2>
+    <p class="hint">Taux de référence officiels de la <b>Banque centrale européenne</b> — en direct, ou à une
+    date passée (comptabilité, factures en devises). Modifiez le montant d'un côté ou de l'autre : la
+    conversion est instantanée.</p>
+    <div class="conv-grid">
+      <div>
+        <label>Devise source</label>
+        <select id="cv-de" onchange="cvRefresh()"></select>
+        <input type="text" inputmode="decimal" id="cv-montant" value="100" class="conv-amount" oninput="cvLive('src')">
       </div>
-      <div class="row">
-        <div><label>Taux</label>
-          <select id="cv-quand" onchange="document.getElementById('cv-date-wrap').style.display = this.value === 'date' ? '' : 'none'">
-            <option value="live">En direct (dernier taux BCE)</option>
-            <option value="date">À une date précise</option>
-          </select></div>
-        <div id="cv-date-wrap" style="display:none"><label>Date</label><input type="date" id="cv-date"></div>
+      <button class="trad-swap" onclick="cvSwap()" title="Inverser les devises">⇄</button>
+      <div>
+        <label>Devise cible</label>
+        <select id="cv-vers" onchange="cvRefresh()"></select>
+        <input type="text" inputmode="decimal" id="cv-resultat" class="conv-amount" oninput="cvLive('dst')">
       </div>
-      <button class="btn" onclick="uiConvert()">Convertir</button>
-      <div class="result" id="cv-result"></div>
     </div>
+    <div class="row" style="margin-top:16px">
+      <div><label>Date du taux (aujourd'hui = dernier taux BCE)</label><input type="date" id="cv-date" onchange="cvRefresh()"></div>
+      <div><label>Taux appliqué</label><div id="cv-taux" style="padding:11px 2px;font-weight:650">—</div></div>
+    </div>
+    <div class="result" id="cv-result"></div>
   </div>
 
-  <!-- Taux BCE -->
-  <div class="subpane" id="sub-taux">
-    <div class="card">
-      <h2>📈 Taux de change de l'euro — BCE</h2>
-      <p class="hint">Taux de référence officiels publiés par la Banque centrale européenne
-      (mis à jour chaque jour ouvrable vers 16h15, heure de Bruxelles). Base : <b>1 EUR</b>.</p>
-      <div class="result" id="taux-result"></div>
-    </div>
+  <div class="conv-tables">
+    <div class="card" id="cv-table-1"></div>
+    <div class="card" id="cv-table-2"></div>
   </div>
 
-  <!-- Codes devises -->
-  <div class="subpane" id="sub-codes">
-    <div class="card">
-      <h2>🌍 Codes des devises par pays (ISO 4217)</h2>
-      <p class="hint">Code alphabétique (3 lettres) et numérique de la devise officielle de chaque pays et territoire.</p>
-      <label>Rechercher un pays, une devise ou un code</label>
-      <input id="codes-filtre" placeholder="ex. Suisse, CHF, dollar…" oninput="renderCodes()">
-      <div id="codes-table" style="margin-top:14px;max-height:480px;overflow-y:auto"></div>
-    </div>
+  <div class="card">
+    <h2>📈 Taux de change de l'euro — BCE</h2>
+    <p class="hint">Taux de référence officiels publiés par la Banque centrale européenne
+    (mis à jour chaque jour ouvrable vers 16h15, heure de Bruxelles). Base : <b>1 EUR</b>.</p>
+    <div class="result" id="taux-result"></div>
+  </div>
+
+  <div class="card">
+    <h2>🌍 Codes des devises par pays (ISO 4217)</h2>
+    <p class="hint">Code alphabétique (3 lettres) et numérique de la devise officielle de chaque pays et territoire.</p>
+    <label>Rechercher un pays, une devise ou un code</label>
+    <input id="codes-filtre" placeholder="ex. Suisse, CHF, dollar…" oninput="renderCodes()">
+    <div id="codes-table" style="margin-top:14px;max-height:480px;overflow-y:auto"></div>
   </div>
 
 </section>
@@ -445,22 +451,21 @@
     commerciale, factures, conditions générales, e-mails clients…</p>
     <div class="trad-grid">
       <div class="trad-pane">
-        <select id="trad-src" style="border-radius:9px 9px 0 0">
+        <select id="trad-src" style="border-radius:9px 9px 0 0" onchange="tradType(true)">
           <option value="auto">🔍 Détection automatique</option>
           <option value="FR">Français</option><option value="NL">Néerlandais</option>
           <option value="EN">Anglais</option><option value="DE">Allemand</option>
           <option value="ES">Espagnol</option><option value="IT">Italien</option>
           <option value="PT">Portugais</option><option value="PL">Polonais</option>
         </select>
-        <textarea id="trad-in" rows="9" placeholder="Saisissez ou collez votre texte…"
+        <textarea id="trad-in" rows="9" placeholder="Saisissez ou collez votre texte — la traduction est automatique…"
           style="border-radius:0 0 9px 9px;border-top:none;resize:vertical"
-          oninput="document.getElementById('trad-count').textContent = this.value.length.toLocaleString('fr-BE') + ' / 5 000 caractères'"
-          onkeydown="if(event.ctrlKey&&event.key==='Enter')uiTranslate()"></textarea>
+          oninput="tradType()"></textarea>
         <div style="text-align:right;font-size:.76rem;color:var(--muted);margin-top:4px"><span id="trad-count">0 / 5 000 caractères</span></div>
       </div>
       <button class="trad-swap" onclick="tradSwap()" title="Inverser les langues">⇄</button>
       <div class="trad-pane">
-        <select id="trad-dst" style="border-radius:9px 9px 0 0">
+        <select id="trad-dst" style="border-radius:9px 9px 0 0" onchange="tradType(true)">
           <option value="EN">Anglais</option><option value="FR">Français</option>
           <option value="NL">Néerlandais</option><option value="DE">Allemand</option>
           <option value="ES">Espagnol</option><option value="IT">Italien</option>
@@ -473,7 +478,6 @@
         </div>
       </div>
     </div>
-    <button class="btn" id="trad-btn" onclick="uiTranslate()">Traduire <span style="opacity:.6;font-weight:400">(Ctrl+Entrée)</span></button>
     <div class="result" id="trad-result"></div>
   </div>
 </section>
@@ -578,6 +582,7 @@ function showTab(name) {
   if (sec) sec.classList.add("active");
   document.querySelectorAll("nav button").forEach(x => x.classList.toggle("active", x.dataset.tab === name));
   window.scrollTo({ top: 0 });
+  if (name === "devises" && typeof initDevises === "function") initDevises();
 }
 document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
 
@@ -1459,15 +1464,13 @@ async function checkIban() {
   }
 }
 
-/* ---------- sous-onglets Devises (taux BCE via api.frankfurter.dev, sans clé) ---------- */
-function goSub(name) {
-  document.querySelectorAll("#tab-iban .subnav button").forEach(b => b.classList.toggle("active", b.dataset.sub === name));
-  document.querySelectorAll("#tab-iban .subpane").forEach(p => p.classList.toggle("active", p.id === "sub-" + name));
-  track("click", "sous-onglet:" + name);
-  if (name === "convert") initConvert();
-  if (name === "taux") loadTauxBce();
-  if (name === "codes") renderCodes();
-}
+/* ---------- onglet Devises (taux BCE via api.frankfurter.dev, sans clé) ---------- */
+const CV_FLAGS = {
+  EUR: "🇪🇺", USD: "🇺🇸", GBP: "🇬🇧", CHF: "🇨🇭", JPY: "🇯🇵", AUD: "🇦🇺", BGN: "🇧🇬", BRL: "🇧🇷",
+  CAD: "🇨🇦", CNY: "🇨🇳", CZK: "🇨🇿", DKK: "🇩🇰", HKD: "🇭🇰", HUF: "🇭🇺", IDR: "🇮🇩", ILS: "🇮🇱",
+  INR: "🇮🇳", ISK: "🇮🇸", KRW: "🇰🇷", MXN: "🇲🇽", MYR: "🇲🇾", NOK: "🇳🇴", NZD: "🇳🇿", PHP: "🇵🇭",
+  PLN: "🇵🇱", RON: "🇷🇴", SEK: "🇸🇪", SGD: "🇸🇬", THB: "🇹🇭", TRY: "🇹🇷", ZAR: "🇿🇦",
+};
 
 const DEVISES_ECB = {
   EUR: "Euro", USD: "Dollar US", GBP: "Livre sterling", CHF: "Franc suisse", JPY: "Yen japonais",
@@ -1480,11 +1483,16 @@ const DEVISES_ECB = {
   TRY: "Livre turque", ZAR: "Rand sud-africain",
 };
 
-let cvInit = false;
-function initConvert() {
+let cvInit = false, cvRate = null, cvRateDate = null;
+const cvCache = {}; // "date|base" -> réponse Frankfurter
+
+function initDevises() {
+  renderCodes();
+  loadTauxBce();
   if (cvInit) return;
   cvInit = true;
-  const opts = Object.entries(DEVISES_ECB).map(([c, n]) => `<option value="${c}">${c} — ${n}</option>`).join("");
+  const opts = Object.entries(DEVISES_ECB)
+    .map(([c, n]) => `<option value="${c}">${CV_FLAGS[c] || ""} ${c} — ${n}</option>`).join("");
   document.getElementById("cv-de").innerHTML = opts;
   document.getElementById("cv-vers").innerHTML = opts;
   document.getElementById("cv-de").value = "EUR";
@@ -1492,38 +1500,82 @@ function initConvert() {
   const d = document.getElementById("cv-date");
   d.max = new Date().toISOString().slice(0, 10);
   d.value = d.max;
+  cvRefresh();
 }
 
-async function uiConvert() {
-  const montant = parseFloat(document.getElementById("cv-montant").value);
+const cvNum = (s) => parseFloat(String(s).replace(/\s/g, "").replace(",", "."));
+const cvFmt = (n) => n.toLocaleString("fr-BE", { maximumFractionDigits: n < 1 ? 6 : 4 });
+
+// Récupère (avec cache) le taux pour la paire/date choisies, puis recalcule tout
+async function cvRefresh() {
   const de = document.getElementById("cv-de").value, vers = document.getElementById("cv-vers").value;
-  const parDate = document.getElementById("cv-quand").value === "date";
-  const date = document.getElementById("cv-date").value;
-  if (!(montant > 0)) return show("cv-result", "bad", "Indiquez un montant supérieur à zéro.");
-  if (parDate && !date) return show("cv-result", "bad", "Choisissez une date.");
-  track("tool", "convertisseur-devises");
-  if (de === vers) {
-    return show("cv-result", "ok", `<div class="big">${montant.toLocaleString("fr-BE", { maximumFractionDigits: 2 })} ${vers}</div><p class="hint" style="margin:6px 0 0">Devises identiques — aucun taux appliqué.</p>`);
-  }
-  show("cv-result", "neutral", "⏳ Récupération du taux BCE…");
+  const dateInput = document.getElementById("cv-date");
+  const auj = new Date().toISOString().slice(0, 10);
+  const endpoint = (!dateInput.value || dateInput.value >= auj) ? "latest" : dateInput.value;
+  hide("cv-result");
+  if (de === vers) { cvRate = 1; cvRateDate = null; cvLive("src"); return; }
+  const key = endpoint + "|" + de;
   try {
-    const endpoint = parDate ? date : "latest";
-    const r = await fetch(`https://api.frankfurter.dev/v1/${endpoint}?base=${de}&symbols=${vers}`);
-    if (!r.ok) throw new Error("Taux indisponible pour ces paramètres (la BCE ne publie pas le week-end/jours fériés — le taux du jour ouvrable précédent est utilisé, et rien avant janvier 1999).");
-    const d = await r.json();
-    const taux = d.rates[vers];
-    if (!taux) throw new Error("Taux introuvable pour cette paire.");
-    const resultat = montant * taux;
-    show("cv-result", "ok", `
-      <div class="big">${resultat.toLocaleString("fr-BE", { maximumFractionDigits: 4 })} ${vers}</div>
-      <div class="kv" style="margin-top:10px">
-        <span class="k">Montant converti</span><span class="v">${montant.toLocaleString("fr-BE")} ${de} → ${resultat.toLocaleString("fr-BE", { maximumFractionDigits: 4 })} ${vers}</span>
-        <span class="k">Taux appliqué</span><span class="v">1 ${de} = ${taux.toLocaleString("fr-BE", { maximumFractionDigits: 6 })} ${vers}</span>
-        <span class="k">Taux inverse</span><span class="v">1 ${vers} = ${(1 / taux).toLocaleString("fr-BE", { maximumFractionDigits: 6 })} ${de}</span>
-        <span class="k">Date du taux</span><span class="v">${new Date(d.date + "T12:00:00").toLocaleDateString("fr-BE", { day: "numeric", month: "long", year: "numeric" })}</span>
-        <span class="k">Source</span><span class="v">Taux de référence de la Banque centrale européenne</span>
-      </div>`);
-  } catch (e) { show("cv-result", "bad", "❌ " + esc(e.message)); }
+    if (!cvCache[key]) {
+      document.getElementById("cv-taux").textContent = "⏳ …";
+      const r = await fetch(`https://api.frankfurter.dev/v1/${endpoint}?base=${de}`);
+      if (!r.ok) throw new Error("Taux indisponible pour cette date (rien avant janvier 1999 ; le week-end, le taux du vendredi est utilisé).");
+      cvCache[key] = await r.json();
+    }
+    cvRate = cvCache[key].rates[vers];
+    cvRateDate = cvCache[key].date;
+    if (!cvRate) throw new Error("Taux introuvable pour cette paire.");
+    track("tool", "convertisseur-devises");
+    cvLive("src");
+  } catch (e) {
+    cvRate = null;
+    document.getElementById("cv-taux").textContent = "—";
+    show("cv-result", "bad", "❌ " + esc(e.message));
+  }
+}
+
+// Conversion instantanée : direction 'src' (gauche → droite) ou 'dst' (droite → gauche)
+function cvLive(direction) {
+  if (cvRate === null) return;
+  const de = document.getElementById("cv-de").value, vers = document.getElementById("cv-vers").value;
+  const src = document.getElementById("cv-montant"), dst = document.getElementById("cv-resultat");
+  if (direction === "src") {
+    const m = cvNum(src.value);
+    dst.value = isNaN(m) ? "" : cvFmt(m * cvRate);
+  } else {
+    const m = cvNum(dst.value);
+    src.value = isNaN(m) ? "" : cvFmt(m / cvRate);
+  }
+  document.getElementById("cv-titre").textContent =
+    `💱 ${src.value || "…"} ${de} en ${vers}`;
+  document.getElementById("cv-taux").innerHTML = cvRate === 1 ? "1 (devises identiques)" :
+    `1 ${de} = <b style="color:var(--accent)">${cvRate.toLocaleString("fr-BE", { maximumFractionDigits: 6 })}</b> ${vers}
+     <span style="color:var(--muted);font-weight:400;font-size:.82rem"> · BCE du ${new Date(cvRateDate + "T12:00:00").toLocaleDateString("fr-BE")}</span>`;
+  cvTables(de, vers);
+}
+
+function cvSwap() {
+  const de = document.getElementById("cv-de"), vers = document.getElementById("cv-vers");
+  [de.value, vers.value] = [vers.value, de.value];
+  cvRefresh();
+}
+
+// Tableaux de conversion croisés (style OANDA)
+function cvTables(de, vers) {
+  if (!cvRate || de === vers) {
+    document.getElementById("cv-table-1").innerHTML = "";
+    document.getElementById("cv-table-2").innerHTML = "";
+    return;
+  }
+  const paliers = [1, 5, 10, 25, 50, 100, 500, 1000, 5000, 10000, 50000];
+  const table = (from, to, rate) => `
+    <h2 style="font-size:.98rem">Convertir des ${CV_FLAGS[from] || ""} ${from} en ${CV_FLAGS[to] || ""} ${to}</h2>
+    <table class="data" style="margin-top:10px"><tbody>
+      ${paliers.map(p => `<tr><td><b>${p.toLocaleString("fr-BE")} ${from}</b></td>
+        <td class="num">${cvFmt(p * rate)} ${to}</td></tr>`).join("")}
+    </tbody></table>`;
+  document.getElementById("cv-table-1").innerHTML = table(de, vers, cvRate);
+  document.getElementById("cv-table-2").innerHTML = table(vers, de, 1 / cvRate);
 }
 
 async function loadTauxBce() {
@@ -1663,37 +1715,58 @@ function tradSwap() {
   }
 }
 
+// Traduction automatique pendant la frappe (débounce façon DeepL)
+let tradTimer = null, tradDernier = "", tradEnCours = false;
+
+function tradType(immediat) {
+  const text = document.getElementById("trad-in").value;
+  document.getElementById("trad-count").textContent = text.length.toLocaleString("fr-BE") + " / 5 000 caractères";
+  clearTimeout(tradTimer);
+  if (!text.trim()) {
+    document.getElementById("trad-out").innerText = "La traduction apparaîtra ici…";
+    document.getElementById("trad-engine").textContent = "";
+    hide("trad-result");
+    tradDernier = "";
+    return;
+  }
+  tradTimer = setTimeout(uiTranslate, immediat ? 50 : 650);
+}
+
 async function uiTranslate() {
   const text = document.getElementById("trad-in").value.trim();
   const source = document.getElementById("trad-src").value;
   const target = document.getElementById("trad-dst").value;
   hide("trad-result");
-  if (!text) return show("trad-result", "bad", "Saisissez un texte à traduire.");
+  if (!text || tradEnCours) { if (tradEnCours) tradTimer = setTimeout(uiTranslate, 400); return; }
   if (source === target) return show("trad-result", "bad", "Les langues source et cible sont identiques.");
-  const btn = document.getElementById("trad-btn");
-  btn.disabled = true;
-  document.getElementById("trad-out").innerText = "⏳ Traduction en cours…";
+  const cle = source + "|" + target + "|" + text;
+  if (cle === tradDernier) return; // rien de nouveau à traduire
+  tradEnCours = true;
+  document.getElementById("trad-engine").textContent = "⏳ traduction…";
   track("tool", "traduction");
   try {
     const r = await authFetch("/api/translate", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text, source, target }),
     });
-    if (quotaBlocked(r, "trad-result")) { document.getElementById("trad-out").innerText = "La traduction apparaîtra ici…"; return; }
+    if (quotaBlocked(r, "trad-result")) { document.getElementById("trad-engine").textContent = ""; return; }
     const d = await r.json();
-    refreshMe();
     if (!r.ok) {
-      document.getElementById("trad-out").innerText = "La traduction apparaîtra ici…";
+      document.getElementById("trad-engine").textContent = "";
       return show("trad-result", "bad", "❌ " + esc(d.error || "Erreur de traduction"));
     }
+    tradDernier = cle;
     document.getElementById("trad-out").innerText = d.text;
     document.getElementById("trad-engine").textContent =
       (d.detected && source === "auto" ? `Langue détectée : ${NOMS_LANGUES[d.detected] || d.detected} · ` : "") + d.engine;
+    // le texte a peut-être changé pendant la requête : on relance si besoin
+    const actuel = document.getElementById("trad-in").value.trim();
+    if (actuel && actuel !== text) tradTimer = setTimeout(uiTranslate, 300);
   } catch (e) {
-    document.getElementById("trad-out").innerText = "La traduction apparaîtra ici…";
+    document.getElementById("trad-engine").textContent = "";
     show("trad-result", "bad", "❌ " + esc(e.message));
   } finally {
-    btn.disabled = false;
+    tradEnCours = false;
   }
 }
 

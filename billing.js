@@ -323,26 +323,37 @@ module.exports = {
 
 const DEEPL_TARGETS = { EN: "EN-GB", PT: "PT-PT" }; // codes cibles requis par DeepL
 
+let deeplInvalide = false; // mémorise un refus de clé pour ne plus ralentir les traductions suivantes
+
 async function translate(text, source, target) {
-  if (DEEPL_API_KEY) {
-    const host = DEEPL_API_KEY.endsWith(":fx") ? "api-free.deepl.com" : "api.deepl.com";
+  if (DEEPL_API_KEY && !deeplInvalide) {
+    const hosts = DEEPL_API_KEY.endsWith(":fx")
+      ? ["api-free.deepl.com"]
+      : ["api.deepl.com", "api-free.deepl.com"];
     const body = { text: [text], target_lang: DEEPL_TARGETS[target] || target };
     if (source && source !== "auto") body.source_lang = source;
-    const r = await fetch(`https://${host}/v2/translate`, {
-      method: "POST",
-      headers: { Authorization: `DeepL-Auth-Key ${DEEPL_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!r.ok) {
-      const err = await r.text();
-      throw new Error(r.status === 456 ? "Quota mensuel DeepL épuisé." : "DeepL : " + err.slice(0, 150));
+    for (const host of hosts) {
+      try {
+        const r = await fetch(`https://${host}/v2/translate`, {
+          method: "POST",
+          headers: { Authorization: `DeepL-Auth-Key ${DEEPL_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(4000),
+        });
+        if (r.status === 403) continue; // clé refusée sur cet hôte : essayer l'autre
+        if (r.status === 456) throw new Error("Quota mensuel DeepL épuisé.");
+        if (!r.ok) continue;
+        const j = await r.json();
+        return {
+          text: j.translations[0].text,
+          detected: j.translations[0].detected_source_language || null,
+          engine: "DeepL",
+        };
+      } catch (e) {
+        if (e.message.includes("DeepL")) throw e;
+      }
     }
-    const j = await r.json();
-    return {
-      text: j.translations[0].text,
-      detected: j.translations[0].detected_source_language || null,
-      engine: "DeepL",
-    };
+    deeplInvalide = true; // clé refusée partout : moteur de secours direct désormais
   }
   // Secours sans clé : MyMemory (gratuit, ~500 caractères par requête)
   if (text.length > 500) {
@@ -360,6 +371,8 @@ async function translate(text, source, target) {
   return {
     text: j.responseData.translatedText,
     detected: (j.responseData.detectedLanguage || "").toUpperCase() || null,
-    engine: "moteur de secours (qualité réduite — clé DeepL non configurée)",
+    engine: DEEPL_API_KEY
+      ? "moteur de secours (clé DeepL refusée — vérifiez votre clé API)"
+      : "moteur de secours (qualité réduite — clé DeepL non configurée)",
   };
 }
