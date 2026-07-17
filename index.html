@@ -168,6 +168,27 @@
   .tile .v { font-size: 1.25rem; font-weight: 700; }
   .tile .v.green { color: var(--ok); }
   .tile .sub { display: block; color: var(--muted); font-size: .78rem; margin-top: 3px; }
+  /* ---- sous-onglets ---- */
+  .subnav { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .subnav button {
+    border: 1px solid var(--border); background: var(--card); color: var(--muted);
+    padding: 8px 15px; border-radius: 999px; font-size: .85rem; cursor: pointer;
+    font-weight: 550; transition: all .12s;
+  }
+  .subnav button:hover:not(.active) { border-color: var(--accent); color: var(--ink); }
+  .subnav button.active { background: var(--accent-soft); border-color: var(--gold-line); color: var(--accent); }
+  .subpane { display: none; }
+  .subpane.active { display: block; animation: fade .18s ease; }
+  table.data { width: 100%; border-collapse: collapse; font-size: .87rem; }
+  table.data th {
+    text-align: left; padding: 8px 10px; color: var(--muted); font-size: .74rem;
+    text-transform: uppercase; letter-spacing: .8px; position: sticky; top: 0; background: var(--card);
+    border-bottom: 1px solid var(--gold-line);
+  }
+  table.data td { padding: 7px 10px; border-bottom: 1px solid var(--border); }
+  table.data tr:hover td { background: #101016; }
+  table.data td.num { font-variant-numeric: tabular-nums; text-align: right; }
+
   /* ---- interrupteur ON/OFF ---- */
   .switch { position: relative; display: inline-block; width: 54px; height: 30px; flex: none; }
   .switch input { opacity: 0; width: 0; height: 0; }
@@ -323,6 +344,15 @@
 
 <!-- ============ IBAN ============ -->
 <section id="tab-iban">
+
+  <div class="subnav">
+    <button class="active" data-sub="valid" onclick="goSub('valid')">🏦 Validation IBAN / BIC</button>
+    <button data-sub="convert" onclick="goSub('convert')">💱 Convertisseur de devises</button>
+    <button data-sub="taux" onclick="goSub('taux')">📈 Taux BCE en direct</button>
+    <button data-sub="codes" onclick="goSub('codes')">🌍 Codes devises par pays</button>
+  </div>
+
+  <div class="subpane active" id="sub-valid">
   <div class="card">
     <h2>Validation IBAN &amp; identification de la banque (BIC)</h2>
     <p class="hint" data-i18n="hint_iban"><b>Tous les pays IBAN sont acceptés</b> (toute l'Europe et au-delà, ~85 pays) :
@@ -333,6 +363,53 @@
     <button class="btn" id="iban-btn" onclick="checkIban()">Valider</button>
     <div class="result" id="iban-result"></div>
   </div>
+  </div>
+
+  <!-- Convertisseur de devises -->
+  <div class="subpane" id="sub-convert">
+    <div class="card">
+      <h2>💱 Convertisseur de devises</h2>
+      <p class="hint">Taux de référence officiels de la <b>Banque centrale européenne</b>. Convertissez au taux
+      du jour ou au taux d'une date passée (utile pour la comptabilité et les factures en devises).</p>
+      <div class="row3">
+        <div><label>Montant</label><input type="number" id="cv-montant" step="any" value="100"></div>
+        <div><label>De</label><select id="cv-de"></select></div>
+        <div><label>Vers</label><select id="cv-vers"></select></div>
+      </div>
+      <div class="row">
+        <div><label>Taux</label>
+          <select id="cv-quand" onchange="document.getElementById('cv-date-wrap').style.display = this.value === 'date' ? '' : 'none'">
+            <option value="live">En direct (dernier taux BCE)</option>
+            <option value="date">À une date précise</option>
+          </select></div>
+        <div id="cv-date-wrap" style="display:none"><label>Date</label><input type="date" id="cv-date"></div>
+      </div>
+      <button class="btn" onclick="uiConvert()">Convertir</button>
+      <div class="result" id="cv-result"></div>
+    </div>
+  </div>
+
+  <!-- Taux BCE -->
+  <div class="subpane" id="sub-taux">
+    <div class="card">
+      <h2>📈 Taux de change de l'euro — BCE</h2>
+      <p class="hint">Taux de référence officiels publiés par la Banque centrale européenne
+      (mis à jour chaque jour ouvrable vers 16h15, heure de Bruxelles). Base : <b>1 EUR</b>.</p>
+      <div class="result" id="taux-result"></div>
+    </div>
+  </div>
+
+  <!-- Codes devises -->
+  <div class="subpane" id="sub-codes">
+    <div class="card">
+      <h2>🌍 Codes des devises par pays (ISO 4217)</h2>
+      <p class="hint">Code alphabétique (3 lettres) et numérique de la devise officielle de chaque pays et territoire.</p>
+      <label>Rechercher un pays, une devise ou un code</label>
+      <input id="codes-filtre" placeholder="ex. Suisse, CHF, dollar…" oninput="renderCodes()">
+      <div id="codes-table" style="margin-top:14px;max-height:480px;overflow-y:auto"></div>
+    </div>
+  </div>
+
 </section>
 
 <!-- ============ COMPTE ============ -->
@@ -1321,6 +1398,194 @@ async function checkIban() {
   } finally {
     btn.disabled = false; btn.textContent = "Valider";
   }
+}
+
+/* ---------- sous-onglets Devises (taux BCE via api.frankfurter.dev, sans clé) ---------- */
+function goSub(name) {
+  document.querySelectorAll("#tab-iban .subnav button").forEach(b => b.classList.toggle("active", b.dataset.sub === name));
+  document.querySelectorAll("#tab-iban .subpane").forEach(p => p.classList.toggle("active", p.id === "sub-" + name));
+  track("click", "sous-onglet:" + name);
+  if (name === "convert") initConvert();
+  if (name === "taux") loadTauxBce();
+  if (name === "codes") renderCodes();
+}
+
+const DEVISES_ECB = {
+  EUR: "Euro", USD: "Dollar US", GBP: "Livre sterling", CHF: "Franc suisse", JPY: "Yen japonais",
+  AUD: "Dollar australien", BGN: "Lev bulgare", BRL: "Real brésilien", CAD: "Dollar canadien",
+  CNY: "Yuan renminbi", CZK: "Couronne tchèque", DKK: "Couronne danoise", HKD: "Dollar de Hong Kong",
+  HUF: "Forint hongrois", IDR: "Roupie indonésienne", ILS: "Shekel israélien", INR: "Roupie indienne",
+  ISK: "Couronne islandaise", KRW: "Won sud-coréen", MXN: "Peso mexicain", MYR: "Ringgit malaisien",
+  NOK: "Couronne norvégienne", NZD: "Dollar néo-zélandais", PHP: "Peso philippin", PLN: "Zloty polonais",
+  RON: "Leu roumain", SEK: "Couronne suédoise", SGD: "Dollar de Singapour", THB: "Baht thaïlandais",
+  TRY: "Livre turque", ZAR: "Rand sud-africain",
+};
+
+let cvInit = false;
+function initConvert() {
+  if (cvInit) return;
+  cvInit = true;
+  const opts = Object.entries(DEVISES_ECB).map(([c, n]) => `<option value="${c}">${c} — ${n}</option>`).join("");
+  document.getElementById("cv-de").innerHTML = opts;
+  document.getElementById("cv-vers").innerHTML = opts;
+  document.getElementById("cv-de").value = "EUR";
+  document.getElementById("cv-vers").value = "USD";
+  const d = document.getElementById("cv-date");
+  d.max = new Date().toISOString().slice(0, 10);
+  d.value = d.max;
+}
+
+async function uiConvert() {
+  const montant = parseFloat(document.getElementById("cv-montant").value);
+  const de = document.getElementById("cv-de").value, vers = document.getElementById("cv-vers").value;
+  const parDate = document.getElementById("cv-quand").value === "date";
+  const date = document.getElementById("cv-date").value;
+  if (!(montant > 0)) return show("cv-result", "bad", "Indiquez un montant supérieur à zéro.");
+  if (parDate && !date) return show("cv-result", "bad", "Choisissez une date.");
+  track("tool", "convertisseur-devises");
+  if (de === vers) {
+    return show("cv-result", "ok", `<div class="big">${montant.toLocaleString("fr-BE", { maximumFractionDigits: 2 })} ${vers}</div><p class="hint" style="margin:6px 0 0">Devises identiques — aucun taux appliqué.</p>`);
+  }
+  show("cv-result", "neutral", "⏳ Récupération du taux BCE…");
+  try {
+    const endpoint = parDate ? date : "latest";
+    const r = await fetch(`https://api.frankfurter.dev/v1/${endpoint}?base=${de}&symbols=${vers}`);
+    if (!r.ok) throw new Error("Taux indisponible pour ces paramètres (la BCE ne publie pas le week-end/jours fériés — le taux du jour ouvrable précédent est utilisé, et rien avant janvier 1999).");
+    const d = await r.json();
+    const taux = d.rates[vers];
+    if (!taux) throw new Error("Taux introuvable pour cette paire.");
+    const resultat = montant * taux;
+    show("cv-result", "ok", `
+      <div class="big">${resultat.toLocaleString("fr-BE", { maximumFractionDigits: 4 })} ${vers}</div>
+      <div class="kv" style="margin-top:10px">
+        <span class="k">Montant converti</span><span class="v">${montant.toLocaleString("fr-BE")} ${de} → ${resultat.toLocaleString("fr-BE", { maximumFractionDigits: 4 })} ${vers}</span>
+        <span class="k">Taux appliqué</span><span class="v">1 ${de} = ${taux.toLocaleString("fr-BE", { maximumFractionDigits: 6 })} ${vers}</span>
+        <span class="k">Taux inverse</span><span class="v">1 ${vers} = ${(1 / taux).toLocaleString("fr-BE", { maximumFractionDigits: 6 })} ${de}</span>
+        <span class="k">Date du taux</span><span class="v">${new Date(d.date + "T12:00:00").toLocaleDateString("fr-BE", { day: "numeric", month: "long", year: "numeric" })}</span>
+        <span class="k">Source</span><span class="v">Taux de référence de la Banque centrale européenne</span>
+      </div>`);
+  } catch (e) { show("cv-result", "bad", "❌ " + esc(e.message)); }
+}
+
+async function loadTauxBce() {
+  show("taux-result", "neutral", "⏳ Chargement des taux BCE…");
+  track("tool", "taux-bce");
+  try {
+    const r = await fetch("https://api.frankfurter.dev/v1/latest?base=EUR");
+    if (!r.ok) throw new Error("Service de taux momentanément indisponible.");
+    const d = await r.json();
+    const principaux = ["USD", "GBP", "CHF", "JPY"];
+    const codes = [...principaux.filter(c => d.rates[c]), ...Object.keys(d.rates).filter(c => !principaux.includes(c)).sort()];
+    show("taux-result", "ok", `
+      <p style="font-size:.85rem;color:var(--muted)">Taux du <b>${new Date(d.date + "T12:00:00").toLocaleDateString("fr-BE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</b>
+      <button class="copy" style="float:right" onclick="loadTauxBce()">↻ actualiser</button></p>
+      <table class="data" style="margin-top:10px"><thead><tr><th>Code</th><th>Devise</th><th style="text-align:right">1 EUR =</th></tr></thead>
+      <tbody>${codes.map(c => `<tr${principaux.includes(c) ? ' style="font-weight:650"' : ""}><td><b>${c}</b></td><td>${DEVISES_ECB[c] || c}</td><td class="num">${d.rates[c].toLocaleString("fr-BE", { maximumFractionDigits: 4 })}</td></tr>`).join("")}</tbody></table>`);
+  } catch (e) { show("taux-result", "bad", "❌ " + esc(e.message)); }
+}
+
+/* ---------- codes des devises par pays (ISO 4217) ---------- */
+const PAYS_DEVISES = [
+["AFGHANISTAN","Afghani","AFN","971"],["AFRIQUE DU SUD","Rand","ZAR","710"],["ALBANIE","Lek","ALL","008"],
+["ALGÉRIE","Dinar algérien","DZD","012"],["ALLEMAGNE","Euro","EUR","978"],["ANDORRE","Euro","EUR","978"],
+["ANGOLA","Kwanza","AOA","973"],["ANGUILLA","Dollar des Caraïbes orientales","XCD","951"],
+["ANTIGUA-ET-BARBUDA","Dollar des Caraïbes orientales","XCD","951"],["ARABIE SAOUDITE","Riyal saoudien","SAR","682"],
+["ARGENTINE","Peso argentin","ARS","032"],["ARMÉNIE","Dram arménien","AMD","051"],["ARUBA","Florin arubais","AWG","533"],
+["AUSTRALIE","Dollar australien","AUD","036"],["AUTRICHE","Euro","EUR","978"],["AZERBAÏDJAN","Manat azerbaïdjanais","AZN","944"],
+["BAHAMAS","Dollar bahaméen","BSD","044"],["BAHREÏN","Dinar bahreïni","BHD","048"],["BANGLADESH","Taka","BDT","050"],
+["BARBADE","Dollar barbadien","BBD","052"],["BELGIQUE","Euro","EUR","978"],["BELIZE","Dollar bélizien","BZD","084"],
+["BÉNIN","Franc CFA BCEAO","XOF","952"],["BERMUDES","Dollar bermudien","BMD","060"],["BHOUTAN","Ngultrum","BTN","064"],
+["BHOUTAN","Roupie indienne","INR","356"],["BIÉLORUSSIE","Rouble biélorusse","BYN","933"],
+["BOLIVIE","Boliviano","BOB","068"],["BOSNIE-HERZÉGOVINE","Mark convertible","BAM","977"],["BOTSWANA","Pula","BWP","072"],
+["BRÉSIL","Real brésilien","BRL","986"],["BRUNEI","Dollar de Brunei","BND","096"],["BULGARIE","Lev bulgare","BGN","975"],
+["BURKINA FASO","Franc CFA BCEAO","XOF","952"],["BURUNDI","Franc burundais","BIF","108"],
+["CABO VERDE","Escudo cap-verdien","CVE","132"],["CAMBODGE","Riel","KHR","116"],["CAMEROUN","Franc CFA BEAC","XAF","950"],
+["CANADA","Dollar canadien","CAD","124"],["CHILI","Peso chilien","CLP","152"],["CHINE","Yuan renminbi","CNY","156"],
+["CHYPRE","Euro","EUR","978"],["COLOMBIE","Peso colombien","COP","170"],["COMORES","Franc comorien","KMF","174"],
+["CONGO (RÉP. DÉM. DU)","Franc congolais","CDF","976"],["CONGO","Franc CFA BEAC","XAF","950"],
+["CORÉE DU SUD","Won","KRW","410"],["CORÉE DU NORD","Won nord-coréen","KPW","408"],["COSTA RICA","Colon costaricien","CRC","188"],
+["CROATIE","Euro","EUR","978"],["CUBA","Peso cubain","CUP","192"],["CURAÇAO","Florin des Antilles néerlandaises","ANG","532"],
+["CÔTE D'IVOIRE","Franc CFA BCEAO","XOF","952"],["DANEMARK","Couronne danoise","DKK","208"],
+["DJIBOUTI","Franc djiboutien","DJF","262"],["DOMINIQUE","Dollar des Caraïbes orientales","XCD","951"],
+["ÉGYPTE","Livre égyptienne","EGP","818"],["ÉQUATEUR","Dollar US","USD","840"],["ÉRYTHRÉE","Nakfa","ERN","232"],
+["ESPAGNE","Euro","EUR","978"],["ESTONIE","Euro","EUR","978"],["ESWATINI (SWAZILAND)","Lilangeni","SZL","748"],
+["ÉTATS-UNIS","Dollar US","USD","840"],["ÉTHIOPIE","Birr éthiopien","ETB","230"],
+["FIDJI","Dollar fidjien","FJD","242"],["FINLANDE","Euro","EUR","978"],["FRANCE","Euro","EUR","978"],
+["GABON","Franc CFA BEAC","XAF","950"],["GAMBIE","Dalasi","GMD","270"],["GÉORGIE","Lari","GEL","981"],
+["GHANA","Cedi ghanéen","GHS","936"],["GIBRALTAR","Livre de Gibraltar","GIP","292"],["GRÈCE","Euro","EUR","978"],
+["GRENADE","Dollar des Caraïbes orientales","XCD","951"],["GROENLAND","Couronne danoise","DKK","208"],
+["GUADELOUPE","Euro","EUR","978"],["GUAM","Dollar US","USD","840"],["GUATEMALA","Quetzal","GTQ","320"],
+["GUERNESEY","Livre sterling","GBP","826"],["GUINÉE","Franc guinéen","GNF","324"],
+["GUINÉE ÉQUATORIALE","Franc CFA BEAC","XAF","950"],["GUINÉE-BISSAU","Franc CFA BCEAO","XOF","952"],
+["GUYANA","Dollar guyanien","GYD","328"],["GUYANE FRANÇAISE","Euro","EUR","978"],
+["HAÏTI","Gourde","HTG","332"],["HONDURAS","Lempira","HNL","340"],["HONG KONG","Dollar de Hong Kong","HKD","344"],
+["HONGRIE","Forint","HUF","348"],["ÎLE DE MAN","Livre sterling","GBP","826"],["ÎLES CAÏMANS","Dollar des îles Caïmans","KYD","136"],
+["ÎLES COOK","Dollar néo-zélandais","NZD","554"],["ÎLES FÉROÉ","Couronne danoise","DKK","208"],
+["ÎLES MALOUINES","Livre des Malouines","FKP","238"],["ÎLES MARSHALL","Dollar US","USD","840"],
+["ÎLES SALOMON","Dollar des îles Salomon","SBD","090"],["ÎLES TURQUES-ET-CAÏQUES","Dollar US","USD","840"],
+["ÎLES VIERGES (BRIT.)","Dollar US","USD","840"],["ÎLES VIERGES (U.S.)","Dollar US","USD","840"],
+["INDE","Roupie indienne","INR","356"],["INDONÉSIE","Rupiah","IDR","360"],["IRAN","Rial iranien","IRR","364"],
+["IRAQ","Dinar irakien","IQD","368"],["IRLANDE","Euro","EUR","978"],["ISLANDE","Couronne islandaise","ISK","352"],
+["ISRAËL","Nouveau shekel israélien","ILS","376"],["ITALIE","Euro","EUR","978"],
+["JAMAÏQUE","Dollar jamaïcain","JMD","388"],["JAPON","Yen","JPY","392"],["JERSEY","Livre sterling","GBP","826"],
+["JORDANIE","Dinar jordanien","JOD","400"],["KAZAKHSTAN","Tenge","KZT","398"],["KENYA","Shilling kényan","KES","404"],
+["KIRGHIZISTAN","Som","KGS","417"],["KIRIBATI","Dollar australien","AUD","036"],["KOWEÏT","Dinar koweïtien","KWD","414"],
+["LAOS","Kip","LAK","418"],["LESOTHO","Loti","LSL","426"],["LETTONIE","Euro","EUR","978"],
+["LIBAN","Livre libanaise","LBP","422"],["LIBERIA","Dollar libérien","LRD","430"],["LIBYE","Dinar libyen","LYD","434"],
+["LIECHTENSTEIN","Franc suisse","CHF","756"],["LITUANIE","Euro","EUR","978"],["LUXEMBOURG","Euro","EUR","978"],
+["MACAO","Pataca","MOP","446"],["MACÉDOINE DU NORD","Denar","MKD","807"],["MADAGASCAR","Ariary malgache","MGA","969"],
+["MALAISIE","Ringgit malaisien","MYR","458"],["MALAWI","Kwacha malawite","MWK","454"],["MALDIVES","Rufiyaa","MVR","462"],
+["MALI","Franc CFA BCEAO","XOF","952"],["MALTE","Euro","EUR","978"],["MAROC","Dirham marocain","MAD","504"],
+["MARTINIQUE","Euro","EUR","978"],["MAURICE","Roupie mauricienne","MUR","480"],["MAURITANIE","Ouguiya","MRU","929"],
+["MAYOTTE","Euro","EUR","978"],["MEXIQUE","Peso mexicain","MXN","484"],["MICRONÉSIE","Dollar US","USD","840"],
+["MOLDAVIE","Leu moldave","MDL","498"],["MONACO","Euro","EUR","978"],["MONGOLIE","Tugrik","MNT","496"],
+["MONTÉNÉGRO","Euro","EUR","978"],["MONTSERRAT","Dollar des Caraïbes orientales","XCD","951"],
+["MOZAMBIQUE","Metical","MZN","943"],["MYANMAR (BIRMANIE)","Kyat","MMK","104"],
+["NAMIBIE","Dollar namibien","NAD","516"],["NAURU","Dollar australien","AUD","036"],["NÉPAL","Roupie népalaise","NPR","524"],
+["NICARAGUA","Cordoba","NIO","558"],["NIGER","Franc CFA BCEAO","XOF","952"],["NIGERIA","Naira","NGN","566"],
+["NIUE","Dollar néo-zélandais","NZD","554"],["NORVÈGE","Couronne norvégienne","NOK","578"],
+["NOUVELLE-CALÉDONIE","Franc CFP","XPF","953"],["NOUVELLE-ZÉLANDE","Dollar néo-zélandais","NZD","554"],
+["OMAN","Rial omanais","OMR","512"],["OUGANDA","Shilling ougandais","UGX","800"],["OUZBÉKISTAN","Sum ouzbek","UZS","860"],
+["PAKISTAN","Roupie pakistanaise","PKR","586"],["PALAOS","Dollar US","USD","840"],["PANAMA","Balboa","PAB","590"],
+["PAPOUASIE-NOUVELLE-GUINÉE","Kina","PGK","598"],["PARAGUAY","Guarani","PYG","600"],["PAYS-BAS","Euro","EUR","978"],
+["PAYS-BAS CARIBÉENS","Dollar US","USD","840"],["PÉROU","Sol","PEN","604"],["PHILIPPINES","Peso philippin","PHP","608"],
+["POLOGNE","Zloty","PLN","985"],["POLYNÉSIE FRANÇAISE","Franc CFP","XPF","953"],["PORTO RICO","Dollar US","USD","840"],
+["PORTUGAL","Euro","EUR","978"],["QATAR","Rial qatari","QAR","634"],["RÉPUBLIQUE CENTRAFRICAINE","Franc CFA BEAC","XAF","950"],
+["RÉPUBLIQUE DOMINICAINE","Peso dominicain","DOP","214"],["RÉPUBLIQUE TCHÈQUE","Couronne tchèque","CZK","203"],
+["RÉUNION","Euro","EUR","978"],["ROUMANIE","Leu roumain","RON","946"],["ROYAUME-UNI","Livre sterling","GBP","826"],
+["RUSSIE","Rouble russe","RUB","643"],["RWANDA","Franc rwandais","RWF","646"],
+["SAINT-BARTHÉLEMY","Euro","EUR","978"],["SAINT-KITTS-ET-NEVIS","Dollar des Caraïbes orientales","XCD","951"],
+["SAINTE-LUCIE","Dollar des Caraïbes orientales","XCD","951"],["SAINT-MARIN","Euro","EUR","978"],
+["SAINT-MARTIN","Euro","EUR","978"],["SAINT-PIERRE-ET-MIQUELON","Euro","EUR","978"],
+["SAINT-VINCENT-ET-LES-GRENADINES","Dollar des Caraïbes orientales","XCD","951"],
+["SAINTE-HÉLÈNE","Livre de Sainte-Hélène","SHP","654"],["SALVADOR","Dollar US","USD","840"],
+["SAMOA","Tala","WST","882"],["SAMOA AMÉRICAINES","Dollar US","USD","840"],
+["SAO TOMÉ-ET-PRINCIPE","Dobra","STN","930"],["SÉNÉGAL","Franc CFA BCEAO","XOF","952"],["SERBIE","Dinar serbe","RSD","941"],
+["SEYCHELLES","Roupie seychelloise","SCR","690"],["SIERRA LEONE","Leone","SLE","925"],
+["SINGAPOUR","Dollar de Singapour","SGD","702"],["SINT MAARTEN","Florin des Antilles néerlandaises","ANG","532"],
+["SLOVAQUIE","Euro","EUR","978"],["SLOVÉNIE","Euro","EUR","978"],["SOMALIE","Shilling somalien","SOS","706"],
+["SOUDAN","Livre soudanaise","SDG","938"],["SOUDAN DU SUD","Livre sud-soudanaise","SSP","728"],
+["SRI LANKA","Roupie srilankaise","LKR","144"],["SUÈDE","Couronne suédoise","SEK","752"],["SUISSE","Franc suisse","CHF","756"],
+["SURINAME","Dollar surinamais","SRD","968"],["SYRIE","Livre syrienne","SYP","760"],
+["TADJIKISTAN","Somoni","TJS","972"],["TAÏWAN","Nouveau dollar taïwanais","TWD","901"],
+["TANZANIE","Shilling tanzanien","TZS","834"],["TCHAD","Franc CFA BEAC","XAF","950"],["THAÏLANDE","Baht","THB","764"],
+["TIMOR ORIENTAL","Dollar US","USD","840"],["TOGO","Franc CFA BCEAO","XOF","952"],["TOKELAU","Dollar néo-zélandais","NZD","554"],
+["TONGA","Pa'anga","TOP","776"],["TRINITÉ-ET-TOBAGO","Dollar de Trinité-et-Tobago","TTD","780"],
+["TUNISIE","Dinar tunisien","TND","788"],["TURKMÉNISTAN","Manat turkmène","TMT","934"],["TURQUIE","Livre turque","TRY","949"],
+["TUVALU","Dollar australien","AUD","036"],["UKRAINE","Hryvnia","UAH","980"],["UNION EUROPÉENNE","Euro","EUR","978"],
+["ÉMIRATS ARABES UNIS","Dirham des ÉAU","AED","784"],["URUGUAY","Peso uruguayen","UYU","858"],
+["VANUATU","Vatu","VUV","548"],["VATICAN (SAINT-SIÈGE)","Euro","EUR","978"],["VENEZUELA","Bolivar","VES","928"],
+["VIETNAM","Dong","VND","704"],["WALLIS-ET-FUTUNA","Franc CFP","XPF","953"],["YÉMEN","Rial yéménite","YER","886"],
+["ZAMBIE","Kwacha zambien","ZMW","967"],["ZIMBABWE","Dollar du Zimbabwe","ZWL","932"],
+];
+
+function renderCodes() {
+  const f = (document.getElementById("codes-filtre").value || "").toLowerCase();
+  const rows = PAYS_DEVISES.filter(r => !f || r.join(" ").toLowerCase().includes(f));
+  document.getElementById("codes-table").innerHTML = rows.length
+    ? `<table class="data"><thead><tr><th>Pays / territoire</th><th>Devise</th><th>Code</th><th style="text-align:right">N° ISO</th></tr></thead>
+       <tbody>${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td><b style="color:var(--accent)">${r[2]}</b></td><td class="num">${r[3]}</td></tr>`).join("")}</tbody></table>`
+    : '<p class="hint">Aucun résultat pour cette recherche.</p>';
 }
 
 /* ---------- Outils PDF (100 % dans le navigateur) ---------- */
