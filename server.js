@@ -501,7 +501,7 @@ const server = http.createServer(async (req, res) => {
       return res.end("404");
     }
     const ext = path.extname(filePath).toLowerCase();
-    const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".ico": "image/x-icon" };
+    const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".ico": "image/x-icon", ".svg": "image/svg+xml", ".png": "image/png" };
     sendCompressed(res, 200, {
       "Content-Type": (types[ext] || "application/octet-stream") + "; charset=utf-8",
       "Cache-Control": "no-cache",

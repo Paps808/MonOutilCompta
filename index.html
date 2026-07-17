@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MonOutilCompta — MOC</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" href="/icon.svg">
 <style>
   :root {
     --bg: #0c0c10; --card: #15151b; --ink: #ece9e2; --muted: #9a948a;
@@ -289,9 +291,7 @@
 
 <header class="topbar">
   <div class="brand">
-    <span class="logo">🧮</span>
-    <span class="brand-name">MonOutilCompta</span>
-    <span class="brand-tag">MOC</span>
+    <img src="/logo.svg" alt="MonOutilCompta" style="height:38px;display:block">
   </div>
   <nav>
     <button class="active" data-tab="tva">Vérification TVA</button>
@@ -919,7 +919,7 @@ function renderAccount() {
   if (!me || !me.authenticated) {
     const views = {
       login: `
-        <div class="auth-logo">🧮</div>
+        <div class="auth-logo"><img src="/icon.svg" alt="" style="width:58px;height:58px"></div>
         <h2>Connexion</h2>
         <p class="sub">Accédez à MonOutilCompta</p>
         <label>Adresse e-mail</label>
@@ -932,7 +932,7 @@ function renderAccount() {
         <div class="switch-auth">Pas encore de compte ?
           <a href="#" onclick="switchAuth('signup');return false"><b>S'inscrire gratuitement</b></a></div>`,
       signup: `
-        <div class="auth-logo">🧮</div>
+        <div class="auth-logo"><img src="/icon.svg" alt="" style="width:58px;height:58px"></div>
         <h2>Inscription</h2>
         <p class="sub">Créez votre compte MonOutilCompta</p>
         <label>Adresse e-mail</label>
