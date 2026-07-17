@@ -467,6 +467,19 @@ const server = http.createServer(async (req, res) => {
         const r = await billing.handleWebhook(req, raw);
         return sendJson(res, r.status, r.body);
       }
+      if (parts[1] === "translate" && req.method === "POST") {
+        const q = await billing.consumeQuota(req, "trad");
+        if (!q.allowed) return sendQuotaError(res, q);
+        const body = JSON.parse((await readBody(req, 256 * 1024)).toString() || "{}");
+        const text = String(body.text || "").slice(0, 5000);
+        if (!text.trim()) return sendJson(res, 400, { error: "Aucun texte à traduire." });
+        try {
+          const t = await billing.translate(text, String(body.source || "auto"), String(body.target || "EN"));
+          return sendJson(res, 200, t);
+        } catch (e) {
+          return sendJson(res, 502, { error: e.message });
+        }
+      }
       if (parts[1] === "vies" && parts.length === 4) return await handleVies(req, res, parts[2], parts[3]);
       if (parts[1] === "bce" && parts.length === 3) return await handleBce(res, parts[2]);
       if (parts[1] === "iban" && parts.length === 3) return await handleIban(req, res, parts[2]);

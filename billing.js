@@ -21,6 +21,7 @@ const SUPABASE_ANON_KEY = cfg("SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6
 const SUPABASE_SERVICE_KEY = cfg("SUPABASE_SERVICE_KEY");
 const STRIPE_SECRET_KEY = cfg("STRIPE_SECRET_KEY");
 const STRIPE_WEBHOOK_SECRET = cfg("STRIPE_WEBHOOK_SECRET");
+const DEEPL_API_KEY = cfg("DEEPL_API_KEY");
 
 const PRICES = {
   monthly: { amount: 499, interval: "month", lookup: "moc_monthly", label: "4,99 € / mois" },
@@ -314,5 +315,51 @@ module.exports = {
   SUPABASE_URL, SUPABASE_ANON_KEY, PRICES,
   STRIPE_READY: !!STRIPE_SECRET_KEY,
   consumeQuota, accountStatus, createCheckout, createPortal, handleWebhook,
-  trackEvent, adminStats, paywallEnabled, setPaywall,
+  trackEvent, adminStats, paywallEnabled, setPaywall, translate,
+  DEEPL_READY: !!DEEPL_API_KEY,
 };
+
+/* ---------- Traduction (DeepL si clé configurée, sinon moteur de secours MyMemory) ---------- */
+
+const DEEPL_TARGETS = { EN: "EN-GB", PT: "PT-PT" }; // codes cibles requis par DeepL
+
+async function translate(text, source, target) {
+  if (DEEPL_API_KEY) {
+    const host = DEEPL_API_KEY.endsWith(":fx") ? "api-free.deepl.com" : "api.deepl.com";
+    const body = { text: [text], target_lang: DEEPL_TARGETS[target] || target };
+    if (source && source !== "auto") body.source_lang = source;
+    const r = await fetch(`https://${host}/v2/translate`, {
+      method: "POST",
+      headers: { Authorization: `DeepL-Auth-Key ${DEEPL_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      const err = await r.text();
+      throw new Error(r.status === 456 ? "Quota mensuel DeepL épuisé." : "DeepL : " + err.slice(0, 150));
+    }
+    const j = await r.json();
+    return {
+      text: j.translations[0].text,
+      detected: j.translations[0].detected_source_language || null,
+      engine: "DeepL",
+    };
+  }
+  // Secours sans clé : MyMemory (gratuit, ~500 caractères par requête)
+  if (text.length > 500) {
+    throw new Error("Sans clé DeepL, le moteur de secours est limité à 500 caractères par traduction.");
+  }
+  const pair = `${source === "auto" ? "Autodetect" : source}|${target}`;
+  const r = await fetch(
+    `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${encodeURIComponent(pair)}`,
+    { headers: { "User-Agent": "MonOutilCompta/1.0" } }
+  );
+  const j = await r.json();
+  if (!j.responseData || j.responseStatus !== 200) {
+    throw new Error("Moteur de secours indisponible : " + ((j.responseDetails || "").slice(0, 120) || "réessayez"));
+  }
+  return {
+    text: j.responseData.translatedText,
+    detected: (j.responseData.detectedLanguage || "").toUpperCase() || null,
+    engine: "moteur de secours (qualité réduite — clé DeepL non configurée)",
+  };
+}

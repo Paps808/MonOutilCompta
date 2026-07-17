@@ -189,6 +189,22 @@
   table.data tr:hover td { background: #101016; }
   table.data td.num { font-variant-numeric: tabular-nums; text-align: right; }
 
+  /* ---- traduction (style DeepL) ---- */
+  .trad-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: stretch; margin-top: 6px; }
+  @media (max-width: 700px) { .trad-grid { grid-template-columns: 1fr; } .trad-swap { transform: rotate(90deg); margin: 0 auto; } }
+  .trad-pane { display: flex; flex-direction: column; }
+  .trad-pane select { font-weight: 600; }
+  .trad-out {
+    flex: 1; min-height: 208px; padding: 11px 13px; border: 1px solid var(--border);
+    border-top: none; border-radius: 0 0 9px 9px; background: #101016; color: var(--ink);
+    font-size: .98rem; white-space: pre-wrap; overflow-y: auto;
+  }
+  .trad-swap {
+    align-self: center; background: var(--card); border: 1px solid var(--gold-line); color: var(--accent);
+    width: 42px; height: 42px; border-radius: 50%; font-size: 1.2rem; cursor: pointer; transition: all .12s;
+  }
+  .trad-swap:hover { background: var(--accent); color: #16100a; }
+
   /* ---- interrupteur ON/OFF ---- */
   .switch { position: relative; display: inline-block; width: 54px; height: 30px; flex: none; }
   .switch input { opacity: 0; width: 0; height: 0; }
@@ -271,6 +287,7 @@
     <button class="active" data-tab="tva">Vérification TVA</button>
     <button data-tab="iban">IBAN / BIC</button>
     <button data-tab="pdf">Outils PDF</button>
+    <button data-tab="trad">Traduction</button>
     <button data-tab="prorata">Prorata</button>
   </nav>
   <div class="top-right">
@@ -417,6 +434,47 @@
   <div class="card" id="compte-card">
     <h2>👤 Mon compte</h2>
     <p class="hint">Chargement…</p>
+  </div>
+</section>
+
+<!-- ============ TRADUCTION ============ -->
+<section id="tab-trad">
+  <div class="card">
+    <h2>🌐 Traduction professionnelle</h2>
+    <p class="hint">Traduction de qualité professionnelle (moteur DeepL). Idéal pour la correspondance
+    commerciale, factures, conditions générales, e-mails clients…</p>
+    <div class="trad-grid">
+      <div class="trad-pane">
+        <select id="trad-src" style="border-radius:9px 9px 0 0">
+          <option value="auto">🔍 Détection automatique</option>
+          <option value="FR">Français</option><option value="NL">Néerlandais</option>
+          <option value="EN">Anglais</option><option value="DE">Allemand</option>
+          <option value="ES">Espagnol</option><option value="IT">Italien</option>
+          <option value="PT">Portugais</option><option value="PL">Polonais</option>
+        </select>
+        <textarea id="trad-in" rows="9" placeholder="Saisissez ou collez votre texte…"
+          style="border-radius:0 0 9px 9px;border-top:none;resize:vertical"
+          oninput="document.getElementById('trad-count').textContent = this.value.length.toLocaleString('fr-BE') + ' / 5 000 caractères'"
+          onkeydown="if(event.ctrlKey&&event.key==='Enter')uiTranslate()"></textarea>
+        <div style="text-align:right;font-size:.76rem;color:var(--muted);margin-top:4px"><span id="trad-count">0 / 5 000 caractères</span></div>
+      </div>
+      <button class="trad-swap" onclick="tradSwap()" title="Inverser les langues">⇄</button>
+      <div class="trad-pane">
+        <select id="trad-dst" style="border-radius:9px 9px 0 0">
+          <option value="EN">Anglais</option><option value="FR">Français</option>
+          <option value="NL">Néerlandais</option><option value="DE">Allemand</option>
+          <option value="ES">Espagnol</option><option value="IT">Italien</option>
+          <option value="PT">Portugais</option><option value="PL">Polonais</option>
+        </select>
+        <div id="trad-out" class="trad-out">La traduction apparaîtra ici…</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+          <span id="trad-engine" style="font-size:.76rem;color:var(--muted)"></span>
+          <button class="copy" onclick="navigator.clipboard.writeText(document.getElementById('trad-out').innerText)">copier</button>
+        </div>
+      </div>
+    </div>
+    <button class="btn" id="trad-btn" onclick="uiTranslate()">Traduire <span style="opacity:.6;font-weight:400">(Ctrl+Entrée)</span></button>
+    <div class="result" id="trad-result"></div>
   </div>
 </section>
 
@@ -963,12 +1021,13 @@ function renderAccount() {
     <li>✅ Validations IBAN / BIC <b>illimitées</b></li>
     <li>✅ Outils PDF <b>illimités</b> (division, fusion, Word, OCR)</li>
     <li>✅ Conversion Word haute fidélité</li>
+    <li>✅ Traduction professionnelle <b>illimitée</b></li>
     <li>✅ Sans engagement — annulable en ligne</li>`;
   card.innerHTML = `
     <div class="card">
       <h2>👤 ${esc(me.email)}</h2>
       <p class="hint" style="margin:6px 0 0">Formule gratuite — il vous reste ce mois-ci :
-      <b>${reste(q.vat)}</b> vérification(s) TVA · <b>${reste(q.iban)}</b> IBAN · <b>${reste(q.pdf)}</b> opération(s) PDF.
+      <b>${reste(q.vat)}</b> vérification(s) TVA · <b>${reste(q.iban)}</b> IBAN · <b>${reste(q.pdf)}</b> opération(s) PDF · <b>${reste(q.trad)}</b> traduction(s).
       <a href="#" onclick="acctLogout();return false" style="float:right">Se déconnecter</a></p>
     </div>
     <div class="pricing">
@@ -1586,6 +1645,56 @@ function renderCodes() {
     ? `<table class="data"><thead><tr><th>Pays / territoire</th><th>Devise</th><th>Code</th><th style="text-align:right">N° ISO</th></tr></thead>
        <tbody>${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td><b style="color:var(--accent)">${r[2]}</b></td><td class="num">${r[3]}</td></tr>`).join("")}</tbody></table>`
     : '<p class="hint">Aucun résultat pour cette recherche.</p>';
+}
+
+/* ---------- traduction ---------- */
+const NOMS_LANGUES = { FR: "français", NL: "néerlandais", EN: "anglais", DE: "allemand", ES: "espagnol", IT: "italien", PT: "portugais", PL: "polonais" };
+
+function tradSwap() {
+  const src = document.getElementById("trad-src"), dst = document.getElementById("trad-dst");
+  const s = src.value === "auto" ? null : src.value;
+  const d = dst.value;
+  if (s) { src.value = d; dst.value = s; }
+  else { src.value = d; dst.value = "FR"; }
+  const sortie = document.getElementById("trad-out").innerText;
+  if (sortie && !sortie.startsWith("La traduction")) {
+    document.getElementById("trad-in").value = sortie;
+    document.getElementById("trad-out").innerText = "La traduction apparaîtra ici…";
+  }
+}
+
+async function uiTranslate() {
+  const text = document.getElementById("trad-in").value.trim();
+  const source = document.getElementById("trad-src").value;
+  const target = document.getElementById("trad-dst").value;
+  hide("trad-result");
+  if (!text) return show("trad-result", "bad", "Saisissez un texte à traduire.");
+  if (source === target) return show("trad-result", "bad", "Les langues source et cible sont identiques.");
+  const btn = document.getElementById("trad-btn");
+  btn.disabled = true;
+  document.getElementById("trad-out").innerText = "⏳ Traduction en cours…";
+  track("tool", "traduction");
+  try {
+    const r = await authFetch("/api/translate", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, source, target }),
+    });
+    if (quotaBlocked(r, "trad-result")) { document.getElementById("trad-out").innerText = "La traduction apparaîtra ici…"; return; }
+    const d = await r.json();
+    refreshMe();
+    if (!r.ok) {
+      document.getElementById("trad-out").innerText = "La traduction apparaîtra ici…";
+      return show("trad-result", "bad", "❌ " + esc(d.error || "Erreur de traduction"));
+    }
+    document.getElementById("trad-out").innerText = d.text;
+    document.getElementById("trad-engine").textContent =
+      (d.detected && source === "auto" ? `Langue détectée : ${NOMS_LANGUES[d.detected] || d.detected} · ` : "") + d.engine;
+  } catch (e) {
+    document.getElementById("trad-out").innerText = "La traduction apparaîtra ici…";
+    show("trad-result", "bad", "❌ " + esc(e.message));
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 /* ---------- Outils PDF (100 % dans le navigateur) ---------- */
