@@ -506,4 +506,6 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`MonOutilCompta (MOC) : http://localhost:${PORT}/`);
+  // préchauffe la connexion DeepL pour que la première traduction soit instantanée
+  billing.translate("bonjour", "FR", "EN").catch(() => {});
 });

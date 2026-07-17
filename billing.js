@@ -323,6 +323,43 @@ module.exports = {
 
 const DEEPL_TARGETS = { EN: "EN-GB", PT: "PT-PT" }; // codes cibles requis par DeepL
 
+// Connexion persistante vers DeepL : les traductions restent instantanées même après une pause
+const https = require("node:https");
+const deeplAgent = new https.Agent({ keepAlive: true, keepAliveMsecs: 30000, maxSockets: 4 });
+const DEEPL_HOST = DEEPL_API_KEY.endsWith(":fx") ? "api-free.deepl.com" : "api.deepl.com";
+
+function deeplRequest(host, pathame, payload) {
+  return new Promise((resolve, reject) => {
+    const data = payload ? JSON.stringify(payload) : null;
+    const req = https.request({
+      host, path: pathame, method: payload ? "POST" : "GET", agent: deeplAgent,
+      headers: {
+        Authorization: `DeepL-Auth-Key ${DEEPL_API_KEY}`,
+        ...(data ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(data) } : {}),
+      },
+      timeout: 10000,
+    }, (res) => {
+      let b = "";
+      res.on("data", (c) => (b += c));
+      res.on("end", () => {
+        let json = null;
+        try { json = JSON.parse(b); } catch {}
+        resolve({ status: res.statusCode, json });
+      });
+    });
+    req.on("timeout", () => req.destroy(new Error("timeout")));
+    req.on("error", reject);
+    if (data) req.write(data);
+    req.end();
+  });
+}
+
+// Entretien de la connexion via /v2/usage (gratuit : ne consomme aucun caractère)
+if (DEEPL_API_KEY) {
+  const ping = setInterval(() => { deeplRequest(DEEPL_HOST, "/v2/usage").catch(() => {}); }, 20000);
+  if (ping.unref) ping.unref();
+}
+
 let deeplInvalide = false; // mémorise un refus de clé pour ne plus ralentir les traductions suivantes
 
 async function translate(text, source, target) {
@@ -332,28 +369,24 @@ async function translate(text, source, target) {
       : ["api.deepl.com", "api-free.deepl.com"];
     const body = { text: [text], target_lang: DEEPL_TARGETS[target] || target };
     if (source && source !== "auto") body.source_lang = source;
+    let refusAuth = false;
     for (const host of hosts) {
       try {
-        const r = await fetch(`https://${host}/v2/translate`, {
-          method: "POST",
-          headers: { Authorization: `DeepL-Auth-Key ${DEEPL_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-          signal: AbortSignal.timeout(4000),
-        });
-        if (r.status === 403) continue; // clé refusée sur cet hôte : essayer l'autre
+        const r = await deeplRequest(host, "/v2/translate", body);
+        if (r.status === 403) { refusAuth = true; continue; } // clé refusée sur cet hôte
         if (r.status === 456) throw new Error("Quota mensuel DeepL épuisé.");
-        if (!r.ok) continue;
-        const j = await r.json();
+        if (r.status !== 200 || !r.json || !r.json.translations) continue;
         return {
-          text: j.translations[0].text,
-          detected: j.translations[0].detected_source_language || null,
+          text: r.json.translations[0].text,
+          detected: r.json.translations[0].detected_source_language || null,
           engine: "DeepL",
         };
       } catch (e) {
         if (e.message.includes("DeepL")) throw e;
+        // lenteur ou panne réseau : on retentera DeepL à la prochaine traduction
       }
     }
-    deeplInvalide = true; // clé refusée partout : moteur de secours direct désormais
+    if (refusAuth) deeplInvalide = true; // vrai refus d'authentification uniquement
   }
   // Secours sans clé : MyMemory (gratuit, ~500 caractères par requête)
   if (text.length > 500) {
