@@ -22,6 +22,7 @@ const SUPABASE_SERVICE_KEY = cfg("SUPABASE_SERVICE_KEY");
 const STRIPE_SECRET_KEY = cfg("STRIPE_SECRET_KEY");
 const STRIPE_WEBHOOK_SECRET = cfg("STRIPE_WEBHOOK_SECRET");
 const DEEPL_API_KEY = cfg("DEEPL_API_KEY");
+const EXCHANGERATE_API_KEY = cfg("EXCHANGERATE_API_KEY");
 
 const PRICES = {
   monthly: { amount: 499, interval: "month", lookup: "moc_monthly", label: "4,99 € / mois" },
@@ -315,9 +316,28 @@ module.exports = {
   SUPABASE_URL, SUPABASE_ANON_KEY, PRICES,
   STRIPE_READY: !!STRIPE_SECRET_KEY,
   consumeQuota, accountStatus, createCheckout, createPortal, handleWebhook,
-  trackEvent, adminStats, paywallEnabled, setPaywall, translate,
+  trackEvent, adminStats, paywallEnabled, setPaywall, translate, fxRates,
   DEEPL_READY: !!DEEPL_API_KEY,
+  FX_READY: !!EXCHANGERATE_API_KEY,
 };
+
+/* ---------- taux de marché mondiaux (ExchangeRate-API, ~160 devises) ---------- */
+// La clé reste côté serveur ; cache 6 h par devise de base pour préserver le quota gratuit.
+const fxCache = {};
+async function fxRates(base) {
+  if (!EXCHANGERATE_API_KEY) throw new Error("Clé ExchangeRate-API non configurée sur ce serveur.");
+  const b = String(base || "").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3);
+  const hit = fxCache[b];
+  if (hit && Date.now() - hit.ts < 6 * 3600 * 1000) return hit.data;
+  const r = await fetch(`https://v6.exchangerate-api.com/v6/${EXCHANGERATE_API_KEY}/latest/${b}`);
+  const j = await r.json().catch(() => null);
+  if (!j || j.result !== "success") {
+    throw new Error("Taux de marché indisponibles : " + ((j && j["error-type"]) || "service injoignable"));
+  }
+  const data = { base: b, date: j.time_last_update_utc, rates: j.conversion_rates };
+  fxCache[b] = { ts: Date.now(), data };
+  return data;
+}
 
 /* ---------- Traduction (DeepL si clé configurée, sinon moteur de secours MyMemory) ---------- */
 

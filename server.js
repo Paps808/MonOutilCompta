@@ -467,6 +467,13 @@ const server = http.createServer(async (req, res) => {
         const r = await billing.handleWebhook(req, raw);
         return sendJson(res, r.status, r.body);
       }
+      if (parts[1] === "fx" && parts.length === 3) {
+        try {
+          return sendJson(res, 200, await billing.fxRates(parts[2]));
+        } catch (e) {
+          return sendJson(res, 502, { error: e.message });
+        }
+      }
       if (parts[1] === "translate" && req.method === "POST") {
         const q = await billing.consumeQuota(req, "trad");
         if (!q.allowed) return sendQuotaError(res, q);

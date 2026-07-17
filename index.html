@@ -1484,16 +1484,39 @@ const DEVISES_ECB = {
   TRY: "Livre turque", ZAR: "Rand sud-africain",
 };
 
-let cvInit = false, cvRate = null, cvRateDate = null;
+let cvInit = false, cvRate = null, cvRateDate = null, cvSource = "BCE";
 const cvCache = {}; // "date|base" -> réponse Frankfurter
+const cvFxCache = {}; // base -> réponse /api/fx
+
+// Drapeau déduit du code devise (USD → US → 🇺🇸) ; devises supranationales → 🌍
+function cvFlag(code) {
+  if (CV_FLAGS[code]) return CV_FLAGS[code];
+  if (code[0] === "X") return "🌍";
+  try { return [...code.slice(0, 2)].map(c => String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65)).join(""); }
+  catch { return ""; }
+}
+
+// Devises hors BCE : construites depuis la table pays (unités de compte techniques exclues)
+const CV_EXCLUS = new Set(["BOV", "COU", "MXV", "UYI", "USN", "CHE", "CHW", "XUA", "XSU", "XDR"]);
+let DEVISES_MONDE = null;
+function cvMonde() {
+  if (!DEVISES_MONDE) {
+    DEVISES_MONDE = {};
+    for (const [, devise, code] of PAYS_DEVISES) {
+      if (code && !DEVISES_ECB[code] && !CV_EXCLUS.has(code) && !DEVISES_MONDE[code]) DEVISES_MONDE[code] = devise;
+    }
+  }
+  return DEVISES_MONDE;
+}
 
 function initDevises() {
   renderCodes();
   loadTauxBce();
   if (cvInit) return;
   cvInit = true;
-  const opts = Object.entries(DEVISES_ECB)
-    .map(([c, n]) => `<option value="${c}">${CV_FLAGS[c] || ""} ${c} — ${n}</option>`).join("");
+  const opt = ([c, n]) => `<option value="${c}">${cvFlag(c)} ${c} — ${n}</option>`;
+  const opts = `<optgroup label="Devises BCE (référence comptable + historique)">${Object.entries(DEVISES_ECB).map(opt).join("")}</optgroup>
+    <optgroup label="Autres devises (taux de marché du jour)">${Object.entries(cvMonde()).sort((a, b) => a[0].localeCompare(b[0])).map(opt).join("")}</optgroup>`;
   document.getElementById("cv-de").innerHTML = opts;
   document.getElementById("cv-vers").innerHTML = opts;
   document.getElementById("cv-de").value = "EUR";
@@ -1507,24 +1530,42 @@ function initDevises() {
 const cvNum = (s) => parseFloat(String(s).replace(/\s/g, "").replace(",", "."));
 const cvFmt = (n) => n.toLocaleString("fr-BE", { maximumFractionDigits: n < 1 ? 6 : 4 });
 
-// Récupère (avec cache) le taux pour la paire/date choisies, puis recalcule tout
+// Récupère (avec cache) le taux pour la paire/date choisies, puis recalcule tout.
+// Paires 100 % BCE → taux de référence BCE (+ historique). Autres devises → taux de marché du jour.
 async function cvRefresh() {
   const de = document.getElementById("cv-de").value, vers = document.getElementById("cv-vers").value;
   const dateInput = document.getElementById("cv-date");
   const auj = new Date().toISOString().slice(0, 10);
   const endpoint = (!dateInput.value || dateInput.value >= auj) ? "latest" : dateInput.value;
+  const paireBce = !!(DEVISES_ECB[de] && DEVISES_ECB[vers]);
   hide("cv-result");
   if (de === vers) { cvRate = 1; cvRateDate = null; cvLive("src"); return; }
-  const key = endpoint + "|" + de;
   try {
-    if (!cvCache[key]) {
-      document.getElementById("cv-taux").textContent = "⏳ …";
-      const r = await fetch(`https://api.frankfurter.dev/v1/${endpoint}?base=${de}`);
-      if (!r.ok) throw new Error("Taux indisponible pour cette date (rien avant janvier 1999 ; le week-end, le taux du vendredi est utilisé).");
-      cvCache[key] = await r.json();
+    document.getElementById("cv-taux").textContent = "⏳ …";
+    if (paireBce) {
+      cvSource = "BCE";
+      const key = endpoint + "|" + de;
+      if (!cvCache[key]) {
+        const r = await fetch(`https://api.frankfurter.dev/v1/${endpoint}?base=${de}`);
+        if (!r.ok) throw new Error("Taux indisponible pour cette date (rien avant janvier 1999 ; le week-end, le taux du vendredi est utilisé).");
+        cvCache[key] = await r.json();
+      }
+      cvRate = cvCache[key].rates[vers];
+      cvRateDate = cvCache[key].date;
+    } else {
+      cvSource = "marché";
+      if (endpoint !== "latest") {
+        throw new Error("L'historique par date n'est disponible que pour les devises BCE. Pour " + de + "/" + vers + ", seul le taux du jour est proposé (remettez la date à aujourd'hui).");
+      }
+      if (!cvFxCache[de]) {
+        const r = await fetch(`/api/fx/${de}`);
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || "Taux de marché indisponibles.");
+        cvFxCache[de] = j;
+      }
+      cvRate = cvFxCache[de].rates[vers];
+      cvRateDate = new Date(cvFxCache[de].date).toISOString().slice(0, 10);
     }
-    cvRate = cvCache[key].rates[vers];
-    cvRateDate = cvCache[key].date;
     if (!cvRate) throw new Error("Taux introuvable pour cette paire.");
     track("tool", "convertisseur-devises");
     cvLive("src");
@@ -1551,7 +1592,7 @@ function cvLive(direction) {
     `💱 ${src.value || "…"} ${de} en ${vers}`;
   document.getElementById("cv-taux").innerHTML = cvRate === 1 ? "1 (devises identiques)" :
     `1 ${de} = <b style="color:var(--accent)">${cvRate.toLocaleString("fr-BE", { maximumFractionDigits: 6 })}</b> ${vers}
-     <span style="color:var(--muted);font-weight:400;font-size:.82rem"> · BCE du ${new Date(cvRateDate + "T12:00:00").toLocaleDateString("fr-BE")}</span>`;
+     <span style="color:var(--muted);font-weight:400;font-size:.82rem"> · ${cvSource === "BCE" ? "BCE" : "taux de marché"} du ${new Date(cvRateDate + "T12:00:00").toLocaleDateString("fr-BE")}</span>`;
   cvTables(de, vers);
 }
 
