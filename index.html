@@ -250,6 +250,55 @@
   .conv-tables { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
   @media (max-width: 640px) { .conv-tables { grid-template-columns: 1fr; } }
 
+  /* ---- traduction (disposition type Google Traduction) ---- */
+  .trad-topbar {
+    display: flex; justify-content: center; align-items: center; gap: 10px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 10px 16px; margin: 6px auto 14px; max-width: 580px; box-shadow: var(--shadow);
+  }
+  .trad-topbar select { width: auto; min-width: 175px; border-radius: 999px; padding: 9px 16px; font-weight: 600; }
+  .trad-swap2 {
+    background: transparent; border: 1px solid var(--border); border-radius: 50%;
+    width: 38px; height: 38px; color: var(--accent); cursor: pointer; flex: none;
+    display: inline-flex; align-items: center; justify-content: center; transition: all .12s;
+  }
+  .trad-swap2:hover { background: var(--accent); color: #16100a; border-color: var(--accent); }
+  .trad-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 700px) { .trad-panels { grid-template-columns: 1fr; } }
+  .trad-panel {
+    position: relative; background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; box-shadow: var(--shadow); display: flex; flex-direction: column;
+    min-height: 300px; padding: 18px 16px 12px;
+  }
+  #trad-in {
+    flex: 1; background: transparent; border: none; box-shadow: none; resize: none;
+    font-size: 1.22rem; line-height: 1.55; padding: 2px 34px 2px 2px; font-family: inherit;
+  }
+  #trad-in:focus { outline: none; border: none; box-shadow: none; }
+  .trad-out2 {
+    flex: 1; font-size: 1.22rem; line-height: 1.55; white-space: pre-wrap;
+    overflow-y: auto; padding: 2px 2px; color: var(--ink);
+  }
+  .trad-out2.vide { color: var(--muted); }
+  .trad-foot {
+    display: flex; align-items: center; gap: 8px;
+    border-top: 1px solid var(--border); padding-top: 9px; margin-top: 10px;
+    color: var(--muted); font-size: .78rem; min-height: 40px;
+  }
+  .ticon {
+    background: transparent; border: none; color: var(--muted); cursor: pointer;
+    padding: 7px; border-radius: 50%; display: inline-flex; transition: all .12s; flex: none;
+  }
+  .ticon:hover { background: var(--hover); color: var(--accent); }
+  .trad-clear { position: absolute; top: 12px; right: 10px; display: none; }
+  .trad-clear.on { display: inline-flex; }
+  .dico-entry {
+    display: flex; align-items: center; gap: 6px; padding: 7px 2px;
+    border-bottom: 1px dashed var(--border); font-size: .98rem;
+  }
+  .dico-entry:last-child { border-bottom: none; }
+  .dico-pos { font-size: .74rem; color: var(--muted); font-style: italic; margin-left: 4px; }
+
   /* ---- traduction (style DeepL) ---- */
   .trad-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: stretch; margin-top: 6px; }
   @media (max-width: 700px) { .trad-grid { grid-template-columns: 1fr; } .trad-swap { transform: rotate(90deg); margin: 0 auto; } }
@@ -517,41 +566,59 @@
 
 <!-- ============ TRADUCTION ============ -->
 <section id="tab-trad">
-  <div class="card">
-    <h2>🌐 Traduction professionnelle</h2>
-    <p class="hint">Traduction de qualité professionnelle (moteur DeepL). Idéal pour la correspondance
-    commerciale, factures, conditions générales, e-mails clients…</p>
-    <div class="trad-grid">
-      <div class="trad-pane">
-        <select id="trad-src" style="border-radius:9px 9px 0 0" onchange="tradType(true)">
-          <option value="auto">🔍 Détection automatique</option>
-          <option value="FR">Français</option><option value="NL">Néerlandais</option>
-          <option value="EN">Anglais</option><option value="DE">Allemand</option>
-          <option value="ES">Espagnol</option><option value="IT">Italien</option>
-          <option value="PT">Portugais</option><option value="PL">Polonais</option>
-        </select>
-        <textarea id="trad-in" rows="9" placeholder="Saisissez ou collez votre texte — la traduction est automatique…"
-          style="border-radius:0 0 9px 9px;border-top:none;resize:vertical"
-          oninput="tradType()"></textarea>
-        <div style="text-align:right;font-size:.76rem;color:var(--muted);margin-top:4px"><span id="trad-count">0 / 5 000 caractères</span></div>
-      </div>
-      <button class="trad-swap" onclick="tradSwap()" title="Inverser les langues">⇄</button>
-      <div class="trad-pane">
-        <select id="trad-dst" style="border-radius:9px 9px 0 0" onchange="tradType(true)">
-          <option value="EN">Anglais</option><option value="FR">Français</option>
-          <option value="NL">Néerlandais</option><option value="DE">Allemand</option>
-          <option value="ES">Espagnol</option><option value="IT">Italien</option>
-          <option value="PT">Portugais</option><option value="PL">Polonais</option>
-        </select>
-        <div id="trad-out" class="trad-out">La traduction apparaîtra ici…</div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
-          <span id="trad-engine" style="font-size:.76rem;color:var(--muted)"></span>
-          <button class="copy" onclick="navigator.clipboard.writeText(document.getElementById('trad-out').innerText)">copier</button>
-        </div>
+
+  <div class="trad-topbar">
+    <select id="trad-src" onchange="tradType(true)">
+      <option value="auto">Détection automatique</option>
+      <option value="FR">Français</option><option value="NL">Néerlandais</option>
+      <option value="EN">Anglais</option><option value="DE">Allemand</option>
+      <option value="ES">Espagnol</option><option value="IT">Italien</option>
+      <option value="PT">Portugais</option><option value="PL">Polonais</option>
+    </select>
+    <button class="trad-swap2" onclick="tradSwap()" title="Inverser les langues">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3l4 4-4 4"/><path d="M20 7H4"/><path d="M8 21l-4-4 4-4"/><path d="M4 17h16"/></svg>
+    </button>
+    <select id="trad-dst" onchange="tradType(true)">
+      <option value="EN">Anglais</option><option value="FR">Français</option>
+      <option value="NL">Néerlandais</option><option value="DE">Allemand</option>
+      <option value="ES">Espagnol</option><option value="IT">Italien</option>
+      <option value="PT">Portugais</option><option value="PL">Polonais</option>
+    </select>
+  </div>
+
+  <div class="trad-panels">
+    <div class="trad-panel">
+      <button class="ticon trad-clear" id="trad-clear" onclick="tradClear()" title="Effacer le texte">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+      <textarea id="trad-in" placeholder="Saisissez ou collez votre texte — la traduction est automatique" oninput="tradType()"></textarea>
+      <div class="trad-foot">
+        <button class="ticon" onclick="tradSpeak('in')" title="Écouter">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+        </button>
+        <span id="trad-count" style="margin-left:auto">0 / 5 000</span>
       </div>
     </div>
-    <div class="result" id="trad-result"></div>
+    <div class="trad-panel">
+      <div id="trad-out" class="trad-out2 vide">La traduction apparaîtra ici…</div>
+      <div class="trad-foot">
+        <button class="ticon" onclick="tradSpeak('out')" title="Écouter">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+        </button>
+        <span id="trad-engine"></span>
+        <button class="ticon" style="margin-left:auto" onclick="tradCopy(this)" title="Copier la traduction">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+        </button>
+      </div>
+    </div>
   </div>
+
+  <div class="card" id="trad-dico" style="display:none">
+    <h2 style="font-size:.95rem">Dictionnaire</h2>
+    <div id="trad-dico-body"></div>
+  </div>
+
+  <div class="result" id="trad-result"></div>
 </section>
 
 <!-- ============ PDF ============ -->
@@ -1986,15 +2053,80 @@ function tradSwap() {
 }
 
 // Traduction automatique pendant la frappe (débounce façon DeepL)
-let tradTimer = null, tradDernier = "", tradEnCours = false;
+let tradTimer = null, tradDernier = "", tradEnCours = false, tradDetecte = null;
+
+const TTS_LANGS = { FR: "fr-FR", NL: "nl-BE", EN: "en-GB", DE: "de-DE", ES: "es-ES", IT: "it-IT", PT: "pt-PT", PL: "pl-PL" };
+function speakText(texte, lang) {
+  if (!texte || !window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(texte);
+  u.lang = TTS_LANGS[lang] || "fr-FR";
+  speechSynthesis.speak(u);
+}
+function tradSpeak(cote) {
+  if (cote === "in") {
+    const src = document.getElementById("trad-src").value;
+    speakText(document.getElementById("trad-in").value.trim(), src === "auto" ? (tradDetecte || "FR") : src);
+  } else {
+    const t = document.getElementById("trad-out").innerText;
+    if (!t.startsWith("La traduction")) speakText(t, document.getElementById("trad-dst").value);
+  }
+}
+function tradCopy(btn) {
+  const t = document.getElementById("trad-out").innerText;
+  if (t.startsWith("La traduction")) return;
+  navigator.clipboard.writeText(t);
+  btn.style.color = "var(--ok)";
+  setTimeout(() => (btn.style.color = ""), 900);
+}
+function tradClear() {
+  document.getElementById("trad-in").value = "";
+  tradType();
+  document.getElementById("trad-in").focus();
+}
+
+// Dictionnaire (mots seuls) : autres traductions possibles via MyMemory
+async function tradDico(mot, src, dst) {
+  const dico = document.getElementById("trad-dico");
+  if (!/^[\p{L}'\-]{2,30}$/u.test(mot)) { dico.style.display = "none"; return; }
+  try {
+    const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(mot)}&langpair=${(src + "|" + dst).toLowerCase()}`);
+    const j = await r.json();
+    const vus = new Set();
+    const items = [];
+    for (const m of (j.matches || [])) {
+      const t = String(m.translation || "").trim();
+      if (!t || t.length > 60 || vus.has(t.toLowerCase()) || t.toLowerCase() === mot.toLowerCase()) continue;
+      vus.add(t.toLowerCase());
+      items.push(t);
+      if (items.length >= 6) break;
+    }
+    if (!items.length) { dico.style.display = "none"; return; }
+    document.getElementById("trad-dico-body").innerHTML = `
+      <div style="font-size:1.05rem;font-weight:650;color:var(--accent);margin:6px 0 4px">${esc(mot)}
+        <span class="dico-pos">${esc(NOMS_LANGUES[src] || src)} → ${esc(NOMS_LANGUES[dst] || dst)}</span></div>
+      ${items.map(t => `
+        <div class="dico-entry"><span style="flex:1">${esc(t)}</span>
+          <button class="ticon" data-say="${esc(t)}" title="Écouter">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>
+          </button></div>`).join("")}`;
+    document.getElementById("trad-dico-body").querySelectorAll("[data-say]").forEach(b =>
+      b.addEventListener("click", () => speakText(b.dataset.say, dst)));
+    dico.style.display = "block";
+  } catch { dico.style.display = "none"; }
+}
 
 function tradType(immediat) {
   const text = document.getElementById("trad-in").value;
-  document.getElementById("trad-count").textContent = text.length.toLocaleString("fr-BE") + " / 5 000 caractères";
+  document.getElementById("trad-count").textContent = text.length.toLocaleString("fr-BE") + " / 5 000";
+  document.getElementById("trad-clear").classList.toggle("on", !!text);
   clearTimeout(tradTimer);
   if (!text.trim()) {
-    document.getElementById("trad-out").innerText = "La traduction apparaîtra ici…";
+    const out = document.getElementById("trad-out");
+    out.innerText = "La traduction apparaîtra ici…";
+    out.classList.add("vide");
     document.getElementById("trad-engine").textContent = "";
+    document.getElementById("trad-dico").style.display = "none";
     hide("trad-result");
     tradDernier = "";
     return;
@@ -2026,9 +2158,13 @@ async function uiTranslate() {
       return show("trad-result", "bad", "❌ " + esc(d.error || "Erreur de traduction"));
     }
     tradDernier = cle;
-    document.getElementById("trad-out").innerText = d.text;
+    tradDetecte = d.detected || null;
+    const out = document.getElementById("trad-out");
+    out.innerText = d.text;
+    out.classList.remove("vide");
     document.getElementById("trad-engine").textContent =
       (d.detected && source === "auto" ? `Langue détectée : ${NOMS_LANGUES[d.detected] || d.detected} · ` : "") + d.engine;
+    tradDico(text, source === "auto" ? (d.detected || "EN") : source, target);
     // le texte a peut-être changé pendant la requête : on relance si besoin
     const actuel = document.getElementById("trad-in").value.trim();
     if (actuel && actuel !== text) tradTimer = setTimeout(uiTranslate, 300);
