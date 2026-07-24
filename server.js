@@ -104,11 +104,13 @@ async function handleVies(req, res, country, vatNumber) {
   const q = await billing.consumeQuota(req, "vat");
   if (!q.allowed) return sendQuotaError(res, q);
   let cc = String(country || "").toUpperCase().replace(/[^A-Z]/g, "");
-  const num = String(vatNumber || "").replace(/[^0-9A-Za-z]/g, "");
+  let num = String(vatNumber || "").replace(/[^0-9A-Za-z]/g, "").toUpperCase();
   if (!/^[A-Z]{2}$/.test(cc) || num.length < 2) {
     return sendJson(res, 400, { error: "Numéro de TVA invalide. Format attendu : BE0123456789" });
   }
+  if (num.startsWith(cc)) num = num.slice(2); // préfixe pays répété dans le numéro
   if (cc === "GR") cc = "EL"; // la Grèce utilise le préfixe EL dans VIES
+  if (cc === "BE" && /^\d{9}$/.test(num)) num = "0" + num; // ancien format belge à 9 chiffres
   if (cc === "GB") return handleHmrc(res, num); // Royaume-Uni : hors VIES depuis le Brexit, API HMRC
   try {
     const { status, json, raw } = await fetchJson(
@@ -251,6 +253,167 @@ const BE_BANKS = [
   [[979, 979], "ARSPBE22", "Argenta"],
 ];
 
+// Registres locaux code banque -> [BIC, nom] par pays.
+// "slice" = position [début, fin) du code banque dans le BBAN (= IBAN sans les 4 premiers caractères).
+const BANK_TABLES = {
+  PT: { slice: [0, 4], banks: {
+    "0007": ["BESCPTPL", "Novo Banco"],
+    "0008": ["BAIPPTPL", "Banco BAI Europa"],
+    "0010": ["BBPIPTPL", "Banco BPI"],
+    "0014": ["IVVSPTPL", "Banco Invest"],
+    "0018": ["TOTAPTPL", "Banco Santander Totta"],
+    "0019": ["BBVAPTPL", "BBVA Portugal"],
+    "0022": ["BRASPTPL", "Banco do Brasil"],
+    "0023": ["ACTVPTPL", "ActivoBank"],
+    "0025": ["CXBIPTPL", "Caixa - Banco de Investimento"],
+    "0033": ["BCOMPTPL", "Millennium BCP (Banco Comercial Português)"],
+    "0034": ["BNPAPTPL", "BNP Paribas Portugal"],
+    "0035": ["CGDIPTPL", "Caixa Geral de Depósitos"],
+    "0036": ["MPIOPTPL", "Banco Montepio"],
+    "0043": ["DEUTPTPL", "Deutsche Bank Portugal"],
+    "0045": ["CCCMPTPL", "Crédito Agrícola"],
+    "0047": ["ESSIPTPL", "Haitong Bank"],
+    "0048": ["BFIAPTPL", "Banco Finantia"],
+    "0061": ["BDIGPTPL", "Banco de Investimento Global (BiG)"],
+    "0063": ["BNFIPTPL", "Bison Bank"],
+    "0064": ["BPGPPTPL", "Banco Português de Gestão"],
+    "0065": ["BESZPTPL", "Banco BEST"],
+    "0079": ["BPNPPTPL", "EuroBic"],
+    "0160": ["BESAPTPA", "Novo Banco dos Açores"],
+    "0169": ["CITIPTPX", "Citibank Europe (Portugal)"],
+    "0170": ["CAGLPTPL", "ABANCA Portugal"],
+    "0189": ["BAPAPTPL", "Banco Atlântico Europa"],
+    "0193": ["CTTVPTPL", "Banco CTT"],
+    "0235": ["BLJCPTPT", "Banco L. J. Carregosa"],
+    "0269": ["BKBKPTPL", "Bankinter Portugal"],
+    "0272": ["WZNKPTPL", "WiZink Bank"],
+    "0275": ["BSABPTPL", "Banco de Sabadell (Portugal)"],
+    "0500": ["BBRUPTPL", "ING Bank (Portugal)"],
+    "0698": ["UIFCPTP1", "UNICRE"],
+    "0916": ["CRBBPTP1", "Banco Credibom"],
+  } },
+  FR: { slice: [0, 5], banks: {
+    "30004": ["BNPAFRPP", "BNP Paribas"],
+    "30003": ["SOGEFRPP", "Société Générale"],
+    "30002": ["CRLYFRPP", "LCL (Crédit Lyonnais)"],
+    "20041": ["PSSTFRPP", "La Banque Postale"],
+    "30066": ["CMCIFRPP", "CIC"],
+    "10278": ["CMCIFR2A", "Crédit Mutuel"],
+    "40618": ["BOUSFRPP", "BoursoBank (ex-Boursorama)"],
+    "30056": ["CCFRFRPP", "CCF (ex-HSBC France)"],
+    "30076": ["NORDFRPP", "Crédit du Nord"],
+    "12548": ["AXABFRPP", "AXA Banque"],
+  }, patterns: [
+    [/^1\d{2}06$/, "AGRIFRPP", "Crédit Agricole (caisse régionale)"],
+    [/^1\d{2}07$/, "CCBPFRPP", "Banque Populaire (banque régionale)"],
+  ] },
+  ES: { slice: [0, 4], banks: {
+    "0049": ["BSCHESMM", "Banco Santander"],
+    "2100": ["CAIXESBB", "CaixaBank"],
+    "0182": ["BBVAESMM", "BBVA"],
+    "0081": ["BSABESBB", "Banco Sabadell"],
+    "0128": ["BKBKESMM", "Bankinter"],
+    "1465": ["INGDESMM", "ING España"],
+    "0073": ["OPENESMM", "Openbank"],
+    "2080": ["CAGLESMM", "ABANCA"],
+    "2085": ["CAZRES2Z", "Ibercaja"],
+    "2095": ["BASKES2B", "Kutxabank"],
+    "3058": ["CCRIES2A", "Cajamar"],
+    "0239": ["EVOBESMM", "EVO Banco"],
+    "0061": ["BMARES2M", "Banca March"],
+  } },
+  IT: { slice: [1, 6], banks: { // BBAN italien : 1 lettre CIN + 5 chiffres ABI + 5 CAB + compte
+    "02008": ["UNCRITMM", "UniCredit"],
+    "03069": ["BCITITMM", "Intesa Sanpaolo"],
+    "01005": ["BNLIITRR", "BNL (BNP Paribas)"],
+    "01030": ["PASCITMM", "Monte dei Paschi di Siena"],
+    "05034": ["BAPPIT21", "Banco BPM"],
+    "05387": ["BPMOIT22", "BPER Banca"],
+    "03062": ["MEDBITMM", "Banca Mediolanum"],
+    "03268": ["SELBIT2B", "Banca Sella"],
+    "07601": ["BPPIITRR", "BancoPosta (Poste Italiane)"],
+  } },
+  NL: { slice: [0, 4], banks: {
+    "INGB": ["INGBNL2A", "ING Bank"],
+    "ABNA": ["ABNANL2A", "ABN AMRO"],
+    "RABO": ["RABONL2U", "Rabobank"],
+    "TRIO": ["TRIONL2U", "Triodos Bank"],
+    "BUNQ": ["BUNQNL2A", "bunq"],
+    "SNSB": ["SNSBNL2A", "SNS Bank"],
+    "ASNB": ["ASNBNL21", "ASN Bank"],
+    "KNAB": ["KNABNL2H", "Knab"],
+    "RBRB": ["RBRBNL21", "RegioBank"],
+    "FVLB": ["FVLBNL22", "Van Lanschot"],
+    "REVO": ["REVONL22", "Revolut Bank (NL)"],
+  } },
+  GB: { slice: [0, 4], banks: {
+    "BARC": ["BARCGB22", "Barclays"],
+    "NWBK": ["NWBKGB2L", "NatWest"],
+    "LOYD": ["LOYDGB2L", "Lloyds Bank"],
+    "MIDL": ["MIDLGB22", "HSBC Bank"],
+    "HBUK": ["HBUKGB4B", "HSBC UK"],
+    "RBOS": ["RBOSGB2L", "Royal Bank of Scotland"],
+    "ABBY": ["ABBYGB2L", "Santander UK"],
+    "MONZ": ["MONZGB2L", "Monzo"],
+    "REVO": ["REVOGB21", "Revolut"],
+    "SRLG": ["SRLGGB3L", "Starling Bank"],
+  } },
+  IE: { slice: [0, 4], banks: {
+    "AIBK": ["AIBKIE2D", "AIB (Allied Irish Banks)"],
+    "BOFI": ["BOFIIE2D", "Bank of Ireland"],
+    "IPBS": ["IPBSIE2D", "Permanent TSB"],
+    "REVO": ["REVOIE23", "Revolut Bank (IE)"],
+  } },
+  PL: { slice: [0, 4], banks: {
+    "1020": ["BPKOPLPW", "PKO Bank Polski"],
+    "1240": ["PKOPPLPW", "Bank Pekao"],
+    "1050": ["INGBPLPW", "ING Bank Śląski"],
+    "1140": ["BREXPLPW", "mBank"],
+    "1090": ["WBKPPLPP", "Santander Bank Polska"],
+    "1160": ["BIGBPLPW", "Bank Millennium"],
+    "2490": ["ALBPPLPW", "Alior Bank"],
+  } },
+  RO: { slice: [0, 4], banks: {
+    "RNCB": ["RNCBROBU", "BCR (Banca Comercială Română)"],
+    "BTRL": ["BTRLRO22", "Banca Transilvania"],
+    "BRDE": ["BRDEROBU", "BRD - Groupe Société Générale"],
+    "INGB": ["INGBROBU", "ING Bank România"],
+    "BACX": ["BACXROBU", "UniCredit Bank România"],
+    "RZBR": ["RZBRROBU", "Raiffeisen Bank România"],
+  } },
+  BG: { slice: [0, 4], banks: {
+    "UNCR": ["UNCRBGSF", "UniCredit Bulbank"],
+    "STSA": ["STSABGSF", "DSK Bank"],
+    "UBBS": ["UBBSBGSF", "United Bulgarian Bank (UBB)"],
+    "FINV": ["FINVBGSF", "First Investment Bank"],
+    "BPBI": ["BPBIBGSF", "Postbank (Eurobank Bulgaria)"],
+  } },
+  LV: { slice: [0, 4], banks: {
+    "HABA": ["HABALV22", "Swedbank Latvia"],
+    "UNLA": ["UNLALV2X", "SEB banka"],
+    "PARX": ["PARXLV22", "Citadele banka"],
+    "RIKO": ["RIKOLV2X", "Luminor Bank Latvia"],
+  } },
+  LT: { slice: [0, 5], banks: {
+    "73000": ["HABALT22", "Swedbank Lietuva"],
+    "70440": ["CBVILT2X", "SEB bankas"],
+    "40100": ["AGBLLT2X", "Luminor Bank Lietuva"],
+    "32500": ["REVOLT21", "Revolut Bank UAB"],
+  } },
+  EE: { slice: [0, 2], banks: {
+    "22": ["HABAEE2X", "Swedbank Estonia"],
+    "10": ["EEUHEE2X", "SEB Pank"],
+    "77": ["LHVBEE22", "LHV Pank"],
+    "96": ["RIKOEE22", "Luminor Bank Estonia"],
+  } },
+  MT: { slice: [0, 4], banks: {
+    "VALL": ["VALLMTMT", "Bank of Valletta"],
+    "MMEB": ["MMEBMTMT", "HSBC Bank Malta"],
+    "APSB": ["APSBMTMT", "APS Bank"],
+  } },
+};
+BANK_TABLES.MC = BANK_TABLES.FR; // Monaco utilise le système bancaire français
+
 function ibanChecksumValid(iban) {
   const rearranged = iban.slice(4) + iban.slice(0, 4);
   let remainder = 0;
@@ -326,6 +489,23 @@ async function handleIban(req, res, rawIban) {
     for (const [[min, max], bic, name] of BE_BANKS) {
       if (bankCode >= min && bankCode <= max) {
         result.bank = { bic, name, source: "table locale (indicatif)" };
+      }
+    }
+  }
+
+  // Recherche du BIC via le registre local du pays (code banque extrait du BBAN)
+  const table = BANK_TABLES[result.country];
+  if (table) {
+    const bban = iban.slice(4);
+    const code = bban.slice(table.slice[0], table.slice[1]);
+    if (!result.bankCode) result.bankCode = code;
+    if (!result.bank && table.banks[code]) {
+      const [bic, name] = table.banks[code];
+      result.bank = { bic, name, source: "registre local" };
+    }
+    if (!result.bank && table.patterns) {
+      for (const [re, bic, name] of table.patterns) {
+        if (re.test(code)) { result.bank = { bic, name, source: "registre local" }; break; }
       }
     }
   }

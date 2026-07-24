@@ -477,7 +477,7 @@
 <section id="tab-tva" class="active">
   <div class="card">
     <h2>Vérification d'un numéro de TVA européen (VIES)</h2>
-    <p class="hint" data-i18n="hint_tva">Saisissez le numéro avec le code pays, ex. <b>BE0403199702</b>, <b>FR40303265045</b>, <b>NL810433941B01</b>.
+    <p class="hint" data-i18n="hint_tva">Saisissez le numéro sous n'importe quel format : <b>BE0403199702</b>, <b>0403.199.702</b> (sans préfixe = belge), <b>be 0403-199-702</b>, <b>FR40303265045</b>, <b>NL810433941B01</b>… Points, tirets, barres et espaces sont ignorés.
     Couverture : <b>les 27 pays de l'UE</b> (consultation officielle VIES, Commission européenne),
     l'Irlande du Nord (<b>XI</b>) et le Royaume-Uni (<b>GB</b> : contrôle du format + lien direct vers le vérificateur officiel gov.uk).
     Le format est contrôlé selon les règles de chaque pays avant l'envoi.
@@ -497,7 +497,7 @@
     <h2>Validation IBAN &amp; identification de la banque (BIC)</h2>
     <p class="hint" data-i18n="hint_iban"><b>Tous les pays IBAN sont acceptés</b> (toute l'Europe et au-delà, ~85 pays) :
     longueur officielle du pays, clé internationale modulo 97, et clés nationales belge et française (RIB) en plus.
-    Le BIC et le nom de la banque sont recherchés automatiquement lorsque le pays le permet (BE, DE, NL, LU, AT, LI…).</p>
+    Le BIC et le nom de la banque sont identifiés automatiquement pour la plupart des pays européens (BE, FR, DE, NL, PT, ES, IT, GB, IE, PL, LU, AT, LI, RO, BG, LT, LV, EE, MT…).</p>
     <label>IBAN</label>
     <input id="iban-num" placeholder="BE68 5390 0754 7034" onkeydown="if(event.key==='Enter')checkIban()">
     <button class="btn" id="iban-btn" onclick="checkIban()">Valider</button>
@@ -1010,8 +1010,8 @@ const I18N = {
 
 const HINTS = {
   nl: {
-    hint_tva: "Voer het nummer in met de landcode, bv. <b>BE0403199702</b>, <b>FR40303265045</b>, <b>NL810433941B01</b>. Dekking: <b>de 27 EU-landen</b> (officiële VIES-raadpleging, Europese Commissie), Noord-Ierland (<b>XI</b>) en het Verenigd Koninkrijk (<b>GB</b>: formaatcontrole + link naar gov.uk). Het formaat wordt per land gecontroleerd. Voor Belgische nummers worden de publieke KBO-gegevens extra opgehaald.",
-    hint_iban: "<b>Alle IBAN-landen worden aanvaard</b> (heel Europa en verder, ~85 landen): officiële lengte per land, internationale modulo 97-controle, plus de Belgische en Franse (RIB) nationale controles. BIC en banknaam worden automatisch opgezocht waar mogelijk (BE, DE, NL, LU, AT, LI…).",
+    hint_tva: "Voer het nummer in om het even welk formaat in: <b>BE0403199702</b>, <b>0403.199.702</b> (zonder prefix = Belgisch), <b>be 0403-199-702</b>, <b>FR40303265045</b>, <b>NL810433941B01</b>… Punten, streepjes, schuine strepen en spaties worden genegeerd. Dekking: <b>de 27 EU-landen</b> (officiële VIES-raadpleging, Europese Commissie), Noord-Ierland (<b>XI</b>) en het Verenigd Koninkrijk (<b>GB</b>: formaatcontrole + link naar gov.uk). Het formaat wordt per land gecontroleerd. Voor Belgische nummers worden de publieke KBO-gegevens extra opgehaald.",
+    hint_iban: "<b>Alle IBAN-landen worden aanvaard</b> (heel Europa en verder, ~85 landen): officiële lengte per land, internationale modulo 97-controle, plus de Belgische en Franse (RIB) nationale controles. BIC en banknaam worden automatisch geïdentificeerd voor de meeste Europese landen (BE, FR, DE, NL, PT, ES, IT, GB, IE, PL, LU, AT, LI, RO, BG, LT, LV, EE, MT…).",
     hint_split: "Kies een PDF: de pagina's verschijnen als miniaturen. <b>Klik</b> op de eerste pagina van een document (begin) en daarna op de laatste (einde) — herhaal per document. Elk klikpaar = één apart PDF-bestand. <b>Privacy:</b> alles gebeurt in uw browser.",
     hint_merge: "Meerdere PDF's samenvoegen tot één, in de volgorde van uw keuze.",
     hint_word: "Volledige conversie naar <b>.docx</b>: lay-out, logo's/afbeeldingen, kolommen en tabellen worden gereconstrueerd (pdf2docx-engine). Bij een <b>gescande</b> PDF start de OCR <b>automatisch</b> vóór de conversie — één knop voor alles.",
@@ -1023,8 +1023,8 @@ const HINTS = {
     footer_privacy: "Uw PDF-documenten worden lokaal in uw browser verwerkt en nooit naar een server verstuurd.",
   },
   en: {
-    hint_tva: "Enter the number with its country code, e.g. <b>BE0403199702</b>, <b>FR40303265045</b>, <b>NL810433941B01</b>. Coverage: <b>all 27 EU countries</b> (official VIES lookup, European Commission), Northern Ireland (<b>XI</b>) and the United Kingdom (<b>GB</b>: format check + gov.uk link). The format is validated per country. For Belgian numbers, public CBE data is fetched as well.",
-    hint_iban: "<b>All IBAN countries are accepted</b> (all of Europe and beyond, ~85 countries): official country length, international modulo 97 check, plus Belgian and French (RIB) national checks. BIC and bank name are looked up automatically where possible (BE, DE, NL, LU, AT, LI…).",
+    hint_tva: "Enter the number in any format: <b>BE0403199702</b>, <b>0403.199.702</b> (no prefix = Belgian), <b>be 0403-199-702</b>, <b>FR40303265045</b>, <b>NL810433941B01</b>… Dots, dashes, slashes and spaces are ignored. Coverage: <b>all 27 EU countries</b> (official VIES lookup, European Commission), Northern Ireland (<b>XI</b>) and the United Kingdom (<b>GB</b>: format check + gov.uk link). The format is validated per country. For Belgian numbers, public CBE data is fetched as well.",
+    hint_iban: "<b>All IBAN countries are accepted</b> (all of Europe and beyond, ~85 countries): official country length, international modulo 97 check, plus Belgian and French (RIB) national checks. BIC and bank name are identified automatically for most European countries (BE, FR, DE, NL, PT, ES, IT, GB, IE, PL, LU, AT, LI, RO, BG, LT, LV, EE, MT…).",
     hint_split: "Choose a PDF: its pages appear as thumbnails. <b>Click</b> the first page of a document (start), then its last page (end) — repeat for each document. Each pair of clicks = one separate PDF file. <b>Privacy:</b> everything happens in your browser.",
     hint_merge: "Combine several PDFs into one, in the order of your choice.",
     hint_word: "Full conversion to <b>.docx</b>: layout, logos/images, columns and tables are rebuilt (pdf2docx engine). If the PDF is a <b>scan</b>, OCR runs <b>automatically</b> before conversion — one button does it all.",
@@ -1641,12 +1641,19 @@ const VAT_FORMATS = {
 };
 
 async function checkTva() {
-  let raw = document.getElementById("tva-num").value.replace(/[\s.\-]/g, "").toUpperCase();
+  let raw = document.getElementById("tva-num").value.replace(/[\s.,/\-_]/g, "").toUpperCase();
   hide("bce-result");
   if (raw.startsWith("GR")) raw = "EL" + raw.slice(2); // la Grèce utilise EL
   if (!/^[A-Z]{2}/.test(raw)) {
-    return show("tva-result", "bad", "Commencez par le code pays (2 lettres). Exemple : <b>BE0403199702</b>.");
+    // Pas de code pays : on interprète comme un numéro belge (ex. 0403.199.702, 403199702)
+    if (/^[01]\d{9}$/.test(raw)) raw = "BE" + raw;
+    else if (/^\d{9}$/.test(raw)) raw = "BE0" + raw;
+    else {
+      return show("tva-result", "bad", "Commencez par le code pays (2 lettres), ex. <b>BE0403199702</b> — ou saisissez un numéro belge sans préfixe (ex. <b>0403.199.702</b>).");
+    }
   }
+  // Ancien format belge à 9 chiffres : on ajoute le 0 initial
+  if (raw.startsWith("BE") && /^\d{9}$/.test(raw.slice(2))) raw = "BE0" + raw.slice(2);
   const fmt = VAT_FORMATS[raw.slice(0, 2)];
   if (!fmt) {
     return show("tva-result", "bad", `Pays « ${esc(raw.slice(0, 2))} » non pris en charge. Pays acceptés : ${Object.keys(VAT_FORMATS).join(", ")}.`);
@@ -1751,7 +1758,7 @@ async function checkIban() {
           ${b ? `<span class="k">Source BIC</span><span class="v">${esc(b.source || "-")}</span>` : ""}
         </div>
         ${checks}
-        ${!b ? '<p style="margin-top:8px;font-size:.85rem;color:var(--muted)">BIC non trouvé automatiquement pour ce pays — l\'IBAN reste mathématiquement valide.</p>' : ""}`);
+        ${!b ? `<p style="margin-top:8px;font-size:.85rem;color:var(--muted)">BIC non répertorié pour ${d.bankCode ? "le code banque " + esc(d.bankCode) + " (" + esc(nomPays(d.country)) + ")" : "ce pays"} — l'IBAN reste mathématiquement valide.</p>` : ""}`);
     }
   } catch (e) {
     show("iban-result", "bad", "Erreur de connexion au serveur local : " + esc(e.message));
