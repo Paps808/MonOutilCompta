@@ -100,6 +100,51 @@ function sendJson(res, status, obj) {
 
 /* ---------- TVA / VIES ---------- */
 
+const VIES_TRANSIENT = new Set([
+  "MS_MAX_CONCURRENT_REQ", "GLOBAL_MAX_CONCURRENT_REQ", "MS_UNAVAILABLE", "SERVICE_UNAVAILABLE", "TIMEOUT",
+]);
+
+const FR_FORMES = {
+  "1000": "Entrepreneur individuel", "5410": "SARL nationale", "5485": "SELARL",
+  "5498": "EURL", "5499": "SARL", "5599": "SA à conseil d'administration",
+  "5710": "SAS", "5720": "SASU", "5785": "SELAS", "6540": "SCI", "6599": "Société civile",
+  "9220": "Association déclarée",
+};
+
+// Secours France quand VIES est saturé : clé de contrôle + annuaire officiel des entreprises (INSEE/RNE)
+async function frFallback(num) {
+  const m = num.match(/^([0-9A-Z]{2})(\d{9})$/);
+  if (!m) return null;
+  const [, cle, siren] = m;
+  if (/^\d{2}$/.test(cle) && (12 + 3 * (Number(siren) % 97)) % 97 !== Number(cle)) {
+    return { valid: false, keyError: true };
+  }
+  try {
+    const { json } = await fetchJson(
+      `https://recherche-entreprises.api.gouv.fr/search?q=${siren}&page=1&per_page=1`,
+      { timeout: 10000 }
+    );
+    const e = json && (json.results || []).find((r) => r.siren === siren);
+    if (!e) return { valid: null, fallback: true, notFound: true };
+    const s = e.siege || {};
+    return {
+      valid: null,
+      fallback: true,
+      name: e.nom_complet || e.nom_raison_sociale || null,
+      address: s.adresse || null,
+      active: e.etat_administratif === "A",
+      formeJuridique: FR_FORMES[e.nature_juridique] || (e.nature_juridique ? "code " + e.nature_juridique : null),
+      activite: e.activite_principale || null,
+      dateCreation: e.date_creation || null,
+      siren,
+      vatListed: Array.isArray(e.tva) && e.tva.includes("FR" + num),
+      source: "Annuaire des entreprises (INSEE / RNE)",
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function handleVies(req, res, country, vatNumber) {
   const q = await billing.consumeQuota(req, "vat");
   if (!q.allowed) return sendQuotaError(res, q);
@@ -113,17 +158,27 @@ async function handleVies(req, res, country, vatNumber) {
   if (cc === "BE" && /^\d{9}$/.test(num)) num = "0" + num; // ancien format belge à 9 chiffres
   if (cc === "GB") return handleHmrc(res, num); // Royaume-Uni : hors VIES depuis le Brexit, API HMRC
   try {
-    const { status, json, raw } = await fetchJson(
-      `https://ec.europa.eu/taxation_customs/vies/rest-api/ms/${cc}/vat/${num}`,
-      { timeout: 15000 }
-    );
+    let json = null, raw = "";
+    // Les services nationaux saturent souvent (surtout la France) : on relance avant d'abandonner
+    for (let essai = 0; essai < 3; essai++) {
+      if (essai) await new Promise((r) => setTimeout(r, 1500 * essai));
+      ({ json, raw } = await fetchJson(
+        `https://ec.europa.eu/taxation_customs/vies/rest-api/ms/${cc}/vat/${num}`,
+        { timeout: 15000 }
+      ));
+      if (!json || !VIES_TRANSIENT.has(json.userError)) break;
+    }
     if (!json) {
       return sendJson(res, 502, { error: "Réponse VIES illisible", detail: (raw || "").slice(0, 200) });
     }
     if (json.userError && json.userError !== "VALID" && json.userError !== "INVALID") {
+      if (cc === "FR") {
+        const fr = await frFallback(num);
+        if (fr) return sendJson(res, 200, { ...fr, countryCode: "FR", vatNumber: num, viesError: json.userError });
+      }
       return sendJson(res, 200, {
         valid: null,
-        error: `Service VIES indisponible pour ce pays (${json.userError}). Réessayez plus tard.`,
+        error: `Le service VIES de ce pays est momentanément saturé (${json.userError}). Réessayez dans quelques minutes.`,
       });
     }
     sendJson(res, 200, {
@@ -603,7 +658,11 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (parts[0] === "api") {
-      if (parts[1] === "health") return sendJson(res, 200, { ok: true, time: new Date().toISOString() });
+      if (parts[1] === "health") {
+        // interroger la base au passage d'UptimeRobot l'empêche d'être mise en pause (offre gratuite Supabase)
+        billing.paywallEnabled().catch(() => {});
+        return sendJson(res, 200, { ok: true, time: new Date().toISOString() });
+      }
       if (parts[1] === "config") {
         return sendJson(res, 200, {
           supabaseUrl: billing.SUPABASE_URL,

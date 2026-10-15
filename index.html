@@ -1670,7 +1670,31 @@ async function checkTva() {
     if (quotaBlocked(r, "tva-result")) return;
     const d = await r.json();
     refreshMe();
-    if (d.error && d.valid !== false) {
+    if (d.fallback) {
+      const retry = `<button class="copy" style="margin-left:0;margin-top:10px" onclick="checkTva()">↻ Réessayer VIES</button>`;
+      if (d.notFound) {
+        show("tva-result", "warn", `⚠️ Le service VIES français est momentanément saturé, et aucune entreprise
+          ne correspond au SIREN <b>${esc(raw.slice(4))}</b> dans l'annuaire officiel. Vérifiez le numéro ou réessayez plus tard.<br>${retry}`);
+      } else {
+        show("tva-result", d.active ? "warn" : "bad", `
+          <h3><span class="badge ${d.active ? "ok" : "bad"}">${d.active ? "✓ ENTREPRISE IDENTIFIÉE" : "✗ ENTREPRISE CESSÉE"}</span></h3>
+          <p style="margin:8px 0 4px;font-size:.86rem">Le service VIES français est momentanément saturé. Le numéro a été contrôlé
+          via l'annuaire officiel des entreprises françaises : clé TVA correcte${d.vatListed ? ", numéro rattaché à cette entreprise" : ""}.</p>
+          <div class="kv">
+            <span class="k">Numéro</span><span class="v">FR ${esc(d.vatNumber)}</span>
+            <span class="k">Dénomination</span><span class="v">${esc(d.name || "-")}</span>
+            <span class="k">Adresse du siège</span><span class="v">${esc(d.address || "-")}</span>
+            <span class="k">Statut</span><span class="v">${d.active ? "Active" : "Cessée"}</span>
+            ${d.formeJuridique ? `<span class="k">Forme juridique</span><span class="v">${esc(d.formeJuridique)}</span>` : ""}
+            ${d.activite ? `<span class="k">Activité (code NAF)</span><span class="v">${esc(d.activite)}</span>` : ""}
+            ${d.dateCreation ? `<span class="k">Date de création</span><span class="v">${new Date(d.dateCreation + "T12:00:00").toLocaleDateString("fr-BE")}</span>` : ""}
+            <span class="k">SIREN</span><span class="v">${esc(d.siren)}</span>
+            <span class="k">Source</span><span class="v">${esc(d.source)}</span>
+          </div>
+          <p style="margin-top:10px;font-size:.8rem;color:var(--muted)">Pour une preuve officielle d'assujettissement intracommunautaire
+          (n° de consultation VIES), relancez la vérification quand le service sera disponible.</p>${retry}`);
+      }
+    } else if (d.error && d.valid !== false) {
       show("tva-result", "warn", "⚠️ " + esc(d.error) +
         (d.manualUrl ? ` <a href="${esc(d.manualUrl)}" target="_blank" rel="noopener">Vérifier sur gov.uk ↗</a>` : ""));
     } else if (d.valid) {
@@ -1688,7 +1712,9 @@ async function checkTva() {
     } else {
       show("tva-result", "bad", `
         <h3><span class="badge bad">✗ NUMÉRO INVALIDE</span></h3>
-        <p style="margin-top:8px">Le numéro <b>${esc(raw)}</b> n'est pas enregistré comme assujetti à la TVA intracommunautaire (VIES, ${new Date().toLocaleDateString("fr-BE")}).</p>`);
+        <p style="margin-top:8px">${d.keyError
+          ? `La clé de contrôle du numéro <b>${esc(raw)}</b> est incorrecte : ce numéro de TVA français ne peut pas exister (faute de frappe probable).`
+          : `Le numéro <b>${esc(raw)}</b> n'est pas enregistré comme assujetti à la TVA intracommunautaire (VIES, ${new Date().toLocaleDateString("fr-BE")}).`}</p>`);
     }
     if (raw.startsWith("BE") && d.valid) loadBce(raw.slice(2));
   } catch (e) {
