@@ -316,7 +316,7 @@ module.exports = {
   SUPABASE_URL, SUPABASE_ANON_KEY, PRICES,
   STRIPE_READY: !!STRIPE_SECRET_KEY,
   consumeQuota, accountStatus, createCheckout, createPortal, handleWebhook,
-  trackEvent, adminStats, paywallEnabled, setPaywall, translate, fxRates,
+  trackEvent, adminStats, paywallEnabled, setPaywall, translate, translationEngine, fxRates,
   DEEPL_READY: !!DEEPL_API_KEY,
   FX_READY: !!EXCHANGERATE_API_KEY,
 };
@@ -408,9 +408,10 @@ async function translate(text, source, target) {
     }
     if (refusAuth) deeplInvalide = true; // vrai refus d'authentification uniquement
   }
-  // Secours sans clé : MyMemory (gratuit, ~500 caractères par requête)
+
+  // Secours sans DeepL : MyMemory (limite journalière partagée par adresse IP, 500 caractères par requête)
   if (text.length > 500) {
-    throw new Error("Sans clé DeepL, le moteur de secours est limité à 500 caractères par traduction.");
+    throw new Error("Le moteur DeepL n'est pas disponible sur ce serveur : les textes de plus de 500 caractères ne peuvent pas être traduits.");
   }
   const pair = `${source === "auto" ? "Autodetect" : source}|${target}`;
   const r = await fetch(
@@ -418,14 +419,18 @@ async function translate(text, source, target) {
     { headers: { "User-Agent": "MonOutilCompta/1.0" } }
   );
   const j = await r.json();
-  if (!j.responseData || j.responseStatus !== 200) {
-    throw new Error("Moteur de secours indisponible : " + ((j.responseDetails || "").slice(0, 120) || "réessayez"));
+  if (!j.responseData || j.responseStatus !== 200 || j.quotaFinished || /^MYMEMORY WARNING/i.test(j.responseData.translatedText || "")) {
+    throw new Error("Le moteur DeepL n'est pas disponible sur ce serveur et le moteur de secours gratuit a atteint sa limite du jour.");
   }
   return {
     text: j.responseData.translatedText,
     detected: (j.responseData.detectedLanguage || "").toUpperCase() || null,
-    engine: DEEPL_API_KEY
-      ? "moteur de secours (clé DeepL refusée — vérifiez votre clé API)"
-      : "moteur de secours (qualité réduite — clé DeepL non configurée)",
+    engine: "moteur de secours",
   };
+}
+
+// Moteur effectivement disponible (affiché dans le panneau admin)
+function translationEngine() {
+  if (DEEPL_API_KEY && !deeplInvalide) return "DeepL";
+  return DEEPL_API_KEY ? "secours (clé DeepL refusée)" : "secours (clé DeepL absente du serveur)";
 }

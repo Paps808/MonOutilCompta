@@ -670,6 +670,7 @@ const server = http.createServer(async (req, res) => {
           prices: { monthly: billing.PRICES.monthly.label, yearly: billing.PRICES.yearly.label },
           billingReady: billing.STRIPE_READY,
           paywall: await billing.paywallEnabled(),
+          translationEngine: billing.translationEngine(),
         });
       }
       if (parts[1] === "admin" && parts[2] === "paywall" && req.method === "POST") {
