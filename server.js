@@ -658,6 +658,22 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (parts[0] === "api") {
+      if (parts[1] === "diag") {
+        // présence des variables uniquement (jamais leur valeur) : sert à diagnostiquer la config Render
+        const seen = (k) => {
+          const v = process.env[k];
+          return v === undefined ? "absente" : `présente (${v.trim().length} caractères${v !== v.trim() ? ", espaces en trop" : ""})`;
+        };
+        return sendJson(res, 200, {
+          service: process.env.RENDER_SERVICE_NAME || null,
+          serviceId: process.env.RENDER_SERVICE_ID || null,
+          commit: (process.env.RENDER_GIT_COMMIT || "").slice(0, 7) || null,
+          demarre: new Date(Date.now() - process.uptime() * 1000).toISOString(),
+          DEEPL_API_KEY: seen("DEEPL_API_KEY"),
+          EXCHANGERATE_API_KEY: seen("EXCHANGERATE_API_KEY"),
+          variablesProches: Object.keys(process.env).filter((k) => /DEEPL|EXCHANGE/i.test(k)),
+        });
+      }
       if (parts[1] === "health") {
         // interroger la base au passage d'UptimeRobot l'empêche d'être mise en pause (offre gratuite Supabase)
         billing.paywallEnabled().catch(() => {});
