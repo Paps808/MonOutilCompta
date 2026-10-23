@@ -17,6 +17,7 @@ const { execFile } = require("node:child_process");
 
 const PYTHON = process.platform === "win32" ? "python" : "python3";
 const billing = require("./billing.js");
+const news = require("./news.js");
 
 // 401 = compte requis, 402 = quota gratuit épuisé
 function sendQuotaError(res, q) {
@@ -658,6 +659,13 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (parts[0] === "api") {
+      if (parts[1] === "news") {
+        try {
+          return sendJson(res, 200, await news.getNews());
+        } catch (e) {
+          return sendJson(res, 502, { error: "Actualités momentanément indisponibles." });
+        }
+      }
       if (parts[1] === "diag") {
         // présence des variables uniquement (jamais leur valeur) : sert à diagnostiquer la config Render
         const seen = (k) => {

@@ -208,6 +208,28 @@
   table.data tr:hover td { background: var(--surface2); }
   table.data td.num { font-variant-numeric: tabular-nums; text-align: right; }
 
+  /* ---- actualités ---- */
+  .tip-card { border-color: var(--gold-line); background: linear-gradient(135deg, var(--accent-soft), var(--card) 70%); }
+  .tip-label { font-size: .72rem; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+  .tip-card h2 { font-size: 1.05rem; }
+  .tip-card p { font-size: .92rem; line-height: 1.6; margin-top: 4px; }
+  .news-chips { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-top: 20px; }
+  .news-chips button {
+    border: 1px solid var(--border); background: var(--card); color: var(--muted); cursor: pointer;
+    padding: 7px 14px; border-radius: 999px; font-size: .84rem; font-weight: 550;
+  }
+  .news-chips button.active { background: var(--accent-soft); border-color: var(--gold-line); color: var(--accent); }
+  .news-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+  .news-grid.seule { grid-template-columns: 1fr; }
+  @media (max-width: 760px) { .news-grid { grid-template-columns: 1fr; } }
+  .news-sec h2 { display: flex; align-items: center; gap: 8px; }
+  .news-item { display: block; padding: 10px 0; border-bottom: 1px solid var(--border); color: var(--ink); text-decoration: none; }
+  .news-item:last-child { border-bottom: none; }
+  .news-item:hover .news-t { color: var(--accent); }
+  .news-t { font-size: .93rem; font-weight: 550; line-height: 1.45; }
+  .news-m { font-size: .76rem; color: var(--muted); margin-top: 3px; }
+  .news-new { display: inline-block; font-size: .64rem; font-weight: 700; color: #16100a; background: var(--accent); border-radius: 4px; padding: 1px 5px; margin-left: 6px; vertical-align: middle; }
+
   /* ---- grille d'outils PDF (style iLovePDF) ---- */
   .tool-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 14px; margin-top: 18px; }
   .tool-card {
@@ -392,7 +414,8 @@
     <img id="brand-logo" src="/logo.svg" alt="MonOutilCompta" style="height:38px;display:block">
   </div>
   <nav>
-    <button class="active" data-tab="tva">Vérification TVA</button>
+    <button class="active" data-tab="news">Actualités</button>
+    <button data-tab="tva">Vérification TVA</button>
     <button data-tab="iban">IBAN / BIC</button>
     <button data-tab="devises">Devises</button>
     <span class="nav-drop">
@@ -473,8 +496,29 @@
 
 </section>
 
+<!-- ============ ACTUALITÉS ============ -->
+<section id="tab-news" class="active">
+  <div class="pdf-titre">
+    <h1>Actualités fiscales & comptables en Belgique</h1>
+    <p id="news-maj">Les informations importantes pour les comptables et les entreprises, mises à jour chaque jour.</p>
+  </div>
+
+  <div class="card tip-card">
+    <div class="tip-label">💡 Conseil du jour</div>
+    <h2 id="tip-titre"></h2>
+    <p id="tip-texte"></p>
+  </div>
+
+  <div class="news-chips" id="news-chips"></div>
+  <div class="news-grid" id="news-grid">
+    <div class="card"><p class="hint">⏳ Chargement des dernières actualités…</p></div>
+  </div>
+  <p class="hint" style="text-align:center;margin-top:16px">Sélection automatique d'articles de la presse belge (L'Echo, Le Soir,
+  La Libre, RTBF, Trends-Tendances…) via Google Actualités. Cliquez sur un titre pour lire l'article complet sur le site du média.</p>
+</section>
+
 <!-- ============ TVA ============ -->
-<section id="tab-tva" class="active">
+<section id="tab-tva">
   <div class="card">
     <h2>Vérification d'un numéro de TVA européen (VIES)</h2>
     <p class="hint" data-i18n="hint_tva">Saisissez le numéro sous n'importe quel format : <b>BE0403199702</b>, <b>0403.199.702</b> (sans préfixe = belge), <b>be 0403-199-702</b>, <b>FR40303265045</b>, <b>NL810433941B01</b>… Points, tirets, barres et espaces sont ignorés.
@@ -863,7 +907,93 @@ function showTab(name) {
   document.querySelectorAll("nav button").forEach(x => x.classList.toggle("active", x.dataset.tab === name));
   window.scrollTo({ top: 0 });
   if (name === "devises" && typeof initDevises === "function") initDevises();
+  if (name === "news" && typeof loadNews === "function") loadNews();
 }
+
+/* ---------- actualités & conseil du jour ---------- */
+const CONSEILS = [
+  ["Gardez la preuve VIES de vos clients européens", "Avant de facturer sans TVA un client d'un autre État membre, vérifiez son numéro dans VIES et conservez la date de consultation : c'est ce qui justifie l'exemption en cas de contrôle."],
+  ["Délais de paiement entre entreprises", "Entre entreprises, le délai de paiement est de 30 jours par défaut et ne peut pas dépasser 60 jours par contrat. Au-delà, des intérêts de retard et une indemnité forfaitaire sont dus de plein droit."],
+  ["Facturation électronique obligatoire", "Depuis le 1er janvier 2026, les factures entre entreprises belges assujetties à la TVA doivent être structurées et échangées via le réseau Peppol. Un PDF envoyé par e-mail ne suffit plus."],
+  ["Conservez vos pièces 10 ans", "Livres comptables, factures et pièces justificatives doivent être conservés 10 ans. Le fisc peut, dans certains cas (fraude, montages complexes), remonter jusqu'à 10 ans en arrière."],
+  ["Les dates des versements anticipés", "Pour un exercice qui suit l'année civile, les versements anticipés se font au plus tard le 10 avril, le 10 juillet, le 10 octobre et le 20 décembre. Les premiers versements sont les plus avantageux."],
+  ["La franchise TVA des petites entreprises", "Une entreprise dont le chiffre d'affaires annuel ne dépasse pas 25 000 € HTVA peut opter pour la franchise : pas de TVA à facturer, mais pas de TVA à récupérer non plus."],
+  ["Déclaration TVA trimestrielle", "Un chiffre d'affaires annuel jusqu'à 2 500 000 € HTVA permet en principe de déposer les déclarations TVA chaque trimestre plutôt que chaque mois (sauf certains secteurs)."],
+  ["Le listing clients annuel", "Le listing annuel des clients assujettis belges doit être déposé au plus tard le 31 mars pour l'année écoulée, dès qu'un client a reçu plus de 250 € HTVA de factures."],
+  ["N'oubliez pas le relevé intracommunautaire", "Les livraisons et services facturés à des assujettis d'autres États membres doivent figurer dans le relevé intracommunautaire, déposé en même temps que la période TVA."],
+  ["Autoliquidation dans la construction", "Pour des travaux immobiliers facturés à un entrepreneur assujetti qui dépose des déclarations TVA, la TVA n'est pas facturée : la mention « Autoliquidation » doit figurer sur la facture."],
+  ["TVA à 6 % pour la rénovation", "La rénovation d'un logement privé de plus de 10 ans peut bénéficier du taux de 6 %. Le client doit remettre une attestation ; à défaut, c'est l'entrepreneur qui en supporte le risque."],
+  ["Frais de restaurant", "Les frais de restaurant professionnels sont déductibles à 69 %. Gardez le ticket et notez la raison professionnelle et les personnes invitées."],
+  ["Cadeaux d'affaires", "Les cadeaux d'affaires sont déductibles à 50 %. La TVA n'est récupérable que sur les cadeaux de 50 € HTVA maximum par unité."],
+  ["Voitures de société", "La déductibilité des voitures dépend désormais fortement des émissions de CO₂ et de la date de commande : pour les véhicules thermiques commandés depuis juillet 2023, elle diminue progressivement."],
+  ["Taux réduit ISOC des PME", "Une PME peut bénéficier du taux de 20 % sur la première tranche de 100 000 € de bénéfice, à condition notamment de verser au moins un dirigeant une rémunération d'au moins 45 000 € (ou égale au bénéfice imposable s'il est inférieur)."],
+  ["Le calendrier des comptes annuels", "L'assemblée générale approuve les comptes dans les 6 mois de la clôture ; ils sont ensuite déposés à la BNB dans les 30 jours, et au plus tard 7 mois après la clôture, sous peine d'amende."],
+  ["Taxe sur les plus-values : la date clé", "Les plus-values réalisées sur actifs financiers depuis le 1er janvier 2026 sont taxées à 10 %, avec une exonération annuelle. Les gains acquis avant le 31 décembre 2025 restent exonérés : conservez la valeur de vos titres à cette date."],
+  ["Courtier étranger : la TOB est pour vous", "Avec un courtier établi à l'étranger, c'est à l'investisseur de déclarer et payer lui-même la taxe sur les opérations de bourse (TOB), avant la fin du 2e mois qui suit l'opération."],
+  ["La taxe sur les comptes-titres", "Une taxe annuelle de 0,15 % s'applique lorsque la valeur moyenne d'un compte-titres dépasse 1 million d'euros. Elle se calcule par compte, pas par titulaire."],
+  ["Droits d'enregistrement réduits en Wallonie", "Depuis le 1er janvier 2025, l'achat de son habitation propre et unique en Wallonie est taxé à 3 % au lieu de 12,5 %, en contrepartie de la suppression du chèque habitat pour les nouveaux crédits."],
+  ["Comparez les régions avant d'acheter", "Les droits d'enregistrement et avantages pour un premier logement diffèrent entre la Wallonie, la Flandre et Bruxelles. Vérifiez toujours les règles de la région où se situe le bien."],
+  ["Mentions obligatoires d'une facture", "Une facture doit notamment comporter un numéro unique et séquentiel, la date, les numéros de TVA des deux parties pour une opération B2B, le taux et le montant de TVA par taux."],
+  ["L'épargne-pension, un avantage chaque année", "L'épargne-pension donne droit à une réduction d'impôt de 30 % (ou 25 % au-delà du premier plafond). Les plafonds sont indexés : vérifiez le montant de l'année avant de verser."],
+  ["Délais de contrôle de l'administration", "Le délai d'investigation du fisc est de 3 ans en règle générale, mais il peut atteindre 4, 6 ou 10 ans selon la complexité et en cas de fraude. Classez vos justificatifs en conséquence."],
+];
+
+function afficherConseil() {
+  const debut = new Date(new Date().getFullYear(), 0, 0);
+  const jour = Math.floor((Date.now() - debut) / 86400000);
+  const [titre, texte] = CONSEILS[jour % CONSEILS.length];
+  document.getElementById("tip-titre").textContent = titre;
+  document.getElementById("tip-texte").textContent = texte;
+}
+
+let newsData = null, newsFiltre = "tout", newsCharge = 0;
+
+function tempsRelatif(iso) {
+  const h = Math.round((Date.now() - new Date(iso)) / 3600000);
+  if (h < 1) return "à l'instant";
+  if (h < 24) return `il y a ${h} h`;
+  const j = Math.round(h / 24);
+  return j === 1 ? "hier" : j < 7 ? `il y a ${j} jours` : new Date(iso).toLocaleDateString("fr-BE", { day: "numeric", month: "long" });
+}
+
+function renderNews() {
+  const grid = document.getElementById("news-grid");
+  const secs = newsData.sections.filter(s => s.items.length && (newsFiltre === "tout" || s.id === newsFiltre));
+  document.getElementById("news-chips").innerHTML =
+    [["tout", "Toutes les rubriques"], ...newsData.sections.filter(s => s.items.length).map(s => [s.id, s.icone + " " + s.titre])]
+      .map(([id, l]) => `<button class="${id === newsFiltre ? "active" : ""}" onclick="newsFiltre='${id}';renderNews()">${esc(l)}</button>`).join("");
+  grid.classList.toggle("seule", newsFiltre !== "tout");
+  grid.innerHTML = secs.length ? secs.map(s => `
+    <div class="card news-sec">
+      <h2>${s.icone} ${esc(s.titre)}</h2>
+      ${s.items.map(a => `
+        <a class="news-item" href="${esc(a.lien)}" target="_blank" rel="noopener" onclick="track('click','news:${s.id}')">
+          <div class="news-t">${esc(a.titre)}${Date.now() - new Date(a.date) < 86400000 ? '<span class="news-new">NOUVEAU</span>' : ""}</div>
+          <div class="news-m">${esc(a.source)} · ${tempsRelatif(a.date)}</div>
+        </a>`).join("")}
+    </div>`).join("") : `<div class="card"><p class="hint">Aucune actualité pour le moment.</p></div>`;
+}
+
+async function loadNews() {
+  afficherConseil();
+  if (newsData && Date.now() - newsCharge < 30 * 60000) return; // rafraîchi toutes les 30 min au plus
+  try {
+    const r = await fetch("/api/news");
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Erreur");
+    newsData = d; newsCharge = Date.now();
+    document.getElementById("news-maj").textContent =
+      `Les informations importantes pour les comptables et les entreprises — mises à jour le ${new Date(d.majLe).toLocaleString("fr-BE", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}.`;
+    renderNews();
+    track("tool", "actualites");
+  } catch (e) {
+    if (!newsData) document.getElementById("news-grid").innerHTML =
+      `<div class="card"><p class="hint">❌ ${esc(e.message)} — réessayez dans quelques instants.</p></div>`;
+  }
+}
+window.addEventListener("load", () => {
+  if (document.getElementById("tab-news").classList.contains("active")) loadNews();
+});
 document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
 
 /* ---------- langues (FR par défaut, NL, EN) ---------- */
