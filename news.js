@@ -87,6 +87,9 @@ async function getNews() {
       .slice(0, PAR_SECTION);
     return { id: s.id, titre: s.titre, icone: s.icone, items };
   });
+  // les rubriques spécifiques sont traitées d'abord (dédoublonnage), mais affichées dans cet ordre
+  const ORDRE = ["fiscal", "compta", "lois", "trading", "immo"];
+  sections.sort((a, b) => ORDRE.indexOf(a.id) - ORDRE.indexOf(b.id));
   const total = sections.reduce((n, s) => n + s.items.length, 0);
   // si toutes les sources échouent, on garde la dernière version connue plutôt qu'une page vide
   if (!total && cache) return cache.data;
