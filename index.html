@@ -228,6 +228,15 @@
   .news-item:hover .news-t { color: var(--accent); }
   .news-t { font-size: .93rem; font-weight: 550; line-height: 1.45; }
   .news-m { font-size: .76rem; color: var(--muted); margin-top: 3px; }
+  main:has(#tab-news.active) { max-width: 1280px; }
+  .news-layout { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 22px; align-items: start; }
+  .news-side { position: sticky; top: 74px; }
+  .news-side .news-sec { margin-top: 18px; max-height: calc(100vh - 110px); overflow-y: auto; }
+  @media (max-width: 1000px) { .news-layout { grid-template-columns: 1fr; } .news-side { position: static; } .news-side .news-sec { max-height: none; } }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); display: inline-block; animation: pulse 1.6s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+  .news-r { font-size: .82rem; color: var(--muted); line-height: 1.45; margin-top: 3px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .news-new { display: inline-block; font-size: .64rem; font-weight: 700; color: #16100a; background: var(--accent); border-radius: 4px; padding: 1px 5px; margin-left: 6px; vertical-align: middle; }
 
   /* ---- grille d'outils PDF (style iLovePDF) ---- */
@@ -503,18 +512,31 @@
     <p id="news-maj">Les informations importantes pour les comptables et les entreprises, mises à jour chaque jour.</p>
   </div>
 
-  <div class="card tip-card">
-    <div class="tip-label">💡 Conseil du jour</div>
-    <h2 id="tip-titre"></h2>
-    <p id="tip-texte"></p>
-  </div>
+  <div class="news-layout">
+    <div class="news-main">
+      <div class="card tip-card">
+        <div class="tip-label">💡 Conseil du jour</div>
+        <h2 id="tip-titre"></h2>
+        <p id="tip-texte"></p>
+      </div>
 
-  <div class="news-chips" id="news-chips"></div>
-  <div class="news-grid" id="news-grid">
-    <div class="card"><p class="hint">⏳ Chargement des dernières actualités…</p></div>
+      <div class="news-chips" id="news-chips"></div>
+      <div class="news-grid" id="news-grid">
+        <div class="card"><p class="hint">⏳ Chargement des dernières actualités…</p></div>
+      </div>
+    </div>
+
+    <aside class="news-side">
+      <div class="card news-sec">
+        <h2>📲 Marchés en direct <span class="live-dot" title="Actualisé toutes les 15 minutes"></span></h2>
+        <p class="hint" style="margin:2px 0 6px" id="news-side-src">Fil Telegram</p>
+        <div id="news-side"><p class="hint">⏳ Chargement…</p></div>
+      </div>
+    </aside>
   </div>
   <p class="hint" style="text-align:center;margin-top:16px">Sélection automatique d'articles de la presse belge (L'Echo, Le Soir,
-  La Libre, RTBF, Trends-Tendances…) via Google Actualités. Cliquez sur un titre pour lire l'article complet sur le site du média.</p>
+  La Libre, RTBF, Trends-Tendances…) via Google Actualités, et des messages économiques de chaînes Telegram publiques
+  (« Marchés en direct », actualisé toutes les 15 minutes). Cliquez sur un titre pour lire l'article ou le message d'origine.</p>
 </section>
 
 <!-- ============ TVA ============ -->
@@ -949,34 +971,46 @@ function afficherConseil() {
 let newsData = null, newsFiltre = "tout", newsCharge = 0;
 
 function tempsRelatif(iso) {
-  const h = Math.round((Date.now() - new Date(iso)) / 3600000);
-  if (h < 1) return "à l'instant";
+  const min = Math.round((Date.now() - new Date(iso)) / 60000);
+  if (min < 2) return "à l'instant";
+  if (min < 60) return `il y a ${min} min`;
+  const h = Math.round(min / 60);
   if (h < 24) return `il y a ${h} h`;
   const j = Math.round(h / 24);
   return j === 1 ? "hier" : j < 7 ? `il y a ${j} jours` : new Date(iso).toLocaleDateString("fr-BE", { day: "numeric", month: "long" });
 }
 
+function itemNews(a, sid) {
+  return `<a class="news-item" href="${esc(a.lien)}" target="_blank" rel="noopener" onclick="track('click','news:${sid}')">
+    <div class="news-t">${esc(a.titre)}${Date.now() - new Date(a.date) < 86400000 && sid !== "telegram" ? '<span class="news-new">NOUVEAU</span>' : ""}</div>
+    ${a.resume ? `<div class="news-r">${esc(a.resume)}</div>` : ""}
+    <div class="news-m">${sid === "telegram" ? "" : esc(a.source) + " · "}${tempsRelatif(a.date)}</div>
+  </a>`;
+}
+
 function renderNews() {
   const grid = document.getElementById("news-grid");
-  const secs = newsData.sections.filter(s => s.items.length && (newsFiltre === "tout" || s.id === newsFiltre));
+  const presse = newsData.sections.filter(s => s.id !== "telegram" && s.items.length);
+  const tg = newsData.sections.find(s => s.id === "telegram");
+  document.getElementById("news-side").innerHTML = tg && tg.items.length
+    ? tg.items.map(a => itemNews(a, "telegram")).join("")
+    : '<p class="hint">Aucun message récent.</p>';
+  if (tg && tg.items.length) document.getElementById("news-side-src").textContent = "Fil Telegram · " + tg.items[0].source;
+  const secs = presse.filter(s => newsFiltre === "tout" || s.id === newsFiltre);
   document.getElementById("news-chips").innerHTML =
-    [["tout", "Toutes les rubriques"], ...newsData.sections.filter(s => s.items.length).map(s => [s.id, s.icone + " " + s.titre])]
+    [["tout", "Toutes les rubriques"], ...presse.map(s => [s.id, s.icone + " " + s.titre])]
       .map(([id, l]) => `<button class="${id === newsFiltre ? "active" : ""}" onclick="newsFiltre='${id}';renderNews()">${esc(l)}</button>`).join("");
   grid.classList.toggle("seule", newsFiltre !== "tout");
   grid.innerHTML = secs.length ? secs.map(s => `
     <div class="card news-sec">
       <h2>${s.icone} ${esc(s.titre)}</h2>
-      ${s.items.map(a => `
-        <a class="news-item" href="${esc(a.lien)}" target="_blank" rel="noopener" onclick="track('click','news:${s.id}')">
-          <div class="news-t">${esc(a.titre)}${Date.now() - new Date(a.date) < 86400000 ? '<span class="news-new">NOUVEAU</span>' : ""}</div>
-          <div class="news-m">${esc(a.source)} · ${tempsRelatif(a.date)}</div>
-        </a>`).join("")}
+      ${s.items.map(a => itemNews(a, s.id)).join("")}
     </div>`).join("") : `<div class="card"><p class="hint">Aucune actualité pour le moment.</p></div>`;
 }
 
 async function loadNews() {
   afficherConseil();
-  if (newsData && Date.now() - newsCharge < 30 * 60000) return; // rafraîchi toutes les 30 min au plus
+  if (newsData && Date.now() - newsCharge < 5 * 60000) return; // pas plus d'un rechargement toutes les 5 min
   try {
     const r = await fetch("/api/news");
     const d = await r.json();
@@ -994,6 +1028,10 @@ async function loadNews() {
 window.addEventListener("load", () => {
   if (document.getElementById("tab-news").classList.contains("active")) loadNews();
 });
+// Fil en direct : mise à jour automatique tant que la page Actualités est affichée
+setInterval(() => {
+  if (!document.hidden && document.getElementById("tab-news").classList.contains("active")) loadNews();
+}, 5 * 60000);
 document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
 
 /* ---------- langues (FR par défaut, NL, EN) ---------- */

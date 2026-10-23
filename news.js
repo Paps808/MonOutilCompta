@@ -73,7 +73,66 @@ async function fetchSection(section) {
 
 const cle = (t) => t.toLowerCase().normalize("NFD").replace(/[^a-z0-9]/g, "").slice(0, 60);
 
+/* ---------- chaînes Telegram publiques (aperçu web officiel t.me/s/…) ---------- */
+
+const TELEGRAM_CHAINES = ["actuminuteoff"];
+const TELEGRAM_MAX = 12;
+const TELEGRAM_CACHE_MS = 15 * 60 * 1000;
+// Messages économiques et financiers uniquement (écarte la géopolitique pure)
+const TELEGRAM_ECO = /📈|📉|💰|💶|💵|\bbourses?\b|\bactions?\b|\bmarch[ée]s?\b|\btaux\b|inflation|\bBCE\b|\bFed\b|\bl['’]or\b|p[ée]trole|\beuros?\b|\bdollars?\b|crypto|bitcoin|S&P|Nasdaq|\bDow\b|\bCAC\b|Bel ?20|\bDAX\b|\bindices?\b|imp[oô]ts?|\btax|fiscal|\bTVA\b|\bbudget|\bdettes?\b|\bPIB\b|croissance|r[ée]cession|\bbanques?\b|entreprises?\b|chiffre d'affaires|b[ée]n[ée]fices?|dividendes?|investiss|\bprix\b|co[uû]te?s?\b|salaires?|\bemplois?\b|ch[oô]mage|faillites?|milliards?|millions?|lev[ée]e de fonds|valorisation|r[ée]sultats|chiffre|\bPMI\b|\bIPO\b|introduction en bourse/i;
+let telegramCache = null;
+
+function texteTelegram(html) {
+  return decode(html.replace(/<br\s*\/?>/g, "\n"));
+}
+
+async function fetchTelegram(chaine) {
+  const r = await fetch(`https://t.me/s/${chaine}`, {
+    headers: { "User-Agent": "Mozilla/5.0 MonOutilCompta" }, signal: AbortSignal.timeout(15000),
+  });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  const html = await r.text();
+  const nom = decode((html.match(/<meta property="og:title" content="([^"]*)"/) || [])[1] || chaine);
+  return html.split(/class="tgme_widget_message_wrap/).slice(1).map((b) => {
+    const post = (b.match(/data-post="([^"]+)"/) || [])[1];
+    const brut = (b.match(/tgme_widget_message_text[^>]*>([\s\S]*?)<\/div>/) || [])[1] || "";
+    const date = (b.match(/<time datetime="([^"]+)"/) || [])[1];
+    const lignes = texteTelegram(brut).split("\n").map((l) => l.trim()).filter(Boolean);
+    if (!post || !date || !lignes.length) return null;
+    return {
+      titre: lignes[0].slice(0, 200),
+      resume: lignes.slice(1).join(" ").slice(0, 220),
+      source: nom,
+      lien: `https://t.me/${post}`,
+      date: new Date(date).toISOString(),
+    };
+  }).filter(Boolean);
+}
+
+async function getTelegram() {
+  if (telegramCache && Date.now() - telegramCache.ts < TELEGRAM_CACHE_MS) return telegramCache.data;
+  const res = await Promise.allSettled(TELEGRAM_CHAINES.map(fetchTelegram));
+  const items = res.flatMap((r) => (r.status === "fulfilled" ? r.value : []))
+    .filter((m) => TELEGRAM_ECO.test(m.titre))
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, TELEGRAM_MAX);
+  if (!items.length && telegramCache) return telegramCache.data;
+  const data = { id: "telegram", titre: "Marchés en direct", icone: "📲", items };
+  telegramCache = { ts: Date.now(), data };
+  return data;
+}
+
+const ORDRE = ["fiscal", "compta", "lois", "trading", "telegram", "immo"];
+
+// Presse (cache 3 h) + Telegram (cache 15 min), assemblées dans l'ordre d'affichage
 async function getNews() {
+  const [presse, telegram] = await Promise.all([getPresse(), getTelegram().catch(() => null)]);
+  const sections = [...presse.sections, ...(telegram ? [telegram] : [])]
+    .sort((a, b) => ORDRE.indexOf(a.id) - ORDRE.indexOf(b.id));
+  return { majLe: presse.majLe, sections };
+}
+
+async function getPresse() {
   if (cache && Date.now() - cache.ts < CACHE_MS) return cache.data;
   const resultats = await Promise.allSettled(SECTIONS.map(fetchSection));
   const vus = new Set();
@@ -87,9 +146,6 @@ async function getNews() {
       .slice(0, PAR_SECTION);
     return { id: s.id, titre: s.titre, icone: s.icone, items };
   });
-  // les rubriques spécifiques sont traitées d'abord (dédoublonnage), mais affichées dans cet ordre
-  const ORDRE = ["fiscal", "compta", "lois", "trading", "immo"];
-  sections.sort((a, b) => ORDRE.indexOf(a.id) - ORDRE.indexOf(b.id));
   const total = sections.reduce((n, s) => n + s.items.length, 0);
   // si toutes les sources échouent, on garde la dernière version connue plutôt qu'une page vide
   if (!total && cache) return cache.data;
