@@ -6,6 +6,7 @@
 <title>MonOutilCompta — MOC</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" href="/icon.svg">
+<link rel="preconnect" href="https://qiunqrtexuvfewpttcvv.supabase.co" crossorigin>
 <script>document.documentElement.dataset.theme = localStorage.getItem("moc_theme") || "dark";</script>
 <style>
   :root {
@@ -2253,6 +2254,23 @@ function tradSwap() {
   }
 }
 
+// La traduction passe par la fonction Supabase « translate » (clé DeepL conservée côté Supabase) ;
+// le serveur du site ne sert que de repli si Supabase est injoignable.
+async function traduireViaSupabase(text, source, target) {
+  const body = JSON.stringify({ text, source, target });
+  if (siteCfg && siteCfg.supabaseUrl) {
+    try {
+      const jeton = (await getToken()) || siteCfg.supabaseAnonKey;
+      return await fetch(`${siteCfg.supabaseUrl}/functions/v1/translate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: siteCfg.supabaseAnonKey, Authorization: "Bearer " + jeton },
+        body,
+      });
+    } catch { /* réseau : repli sur le serveur du site */ }
+  }
+  return authFetch("/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body });
+}
+
 // Traduction automatique pendant la frappe (débounce façon DeepL)
 let tradTimer = null, tradDernier = "", tradEnCours = false, tradDetecte = null;
 
@@ -2415,10 +2433,7 @@ async function uiTranslate() {
   document.getElementById("trad-engine").textContent = "⏳ traduction…";
   track("tool", "traduction");
   try {
-    const r = await authFetch("/api/translate", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, source, target }),
-    });
+    const r = await traduireViaSupabase(text, source, target);
     if (quotaBlocked(r, "trad-result")) { document.getElementById("trad-engine").textContent = ""; return; }
     const d = await r.json();
     if (!r.ok) {
