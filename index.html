@@ -550,7 +550,7 @@
     Le format est contrôlé selon les règles de chaque pays avant l'envoi.
     Pour les numéros belges, les informations publiques BCE sont récupérées en plus.</p>
     <label>Numéro de TVA</label>
-    <input id="tva-num" placeholder="BE0403199702" onkeydown="if(event.key==='Enter')checkTva()">
+    <input id="tva-num" placeholder="Tapez ici" onkeydown="if(event.key==='Enter')checkTva()">
     <button class="btn" id="tva-btn" onclick="checkTva()">Vérifier</button>
     <div class="result" id="tva-result"></div>
     <div class="result" id="bce-result"></div>
@@ -566,7 +566,7 @@
     longueur officielle du pays, clé internationale modulo 97, et clés nationales belge et française (RIB) en plus.
     Le BIC et le nom de la banque sont identifiés automatiquement pour la plupart des pays européens (BE, FR, DE, NL, PT, ES, IT, GB, IE, PL, LU, AT, LI, RO, BG, LT, LV, EE, MT…).</p>
     <label>IBAN</label>
-    <input id="iban-num" placeholder="BE68 5390 0754 7034" onkeydown="if(event.key==='Enter')checkIban()">
+    <input id="iban-num" placeholder="Tapez ici" onkeydown="if(event.key==='Enter')checkIban()">
     <button class="btn" id="iban-btn" onclick="checkIban()">Valider</button>
     <div class="result" id="iban-result"></div>
   </div>
@@ -576,7 +576,7 @@
     <p class="hint">Saisissez un code BIC de 8 ou 11 caractères (ex. <b>KCBLTZTZ</b>, <b>GEBABEBBXXX</b>) : nom de la banque,
     adresse du siège, pays, agence et identifiant LEI. Sources : registre officiel GLEIF et base mondiale des codes SWIFT.</p>
     <label>Code BIC / SWIFT</label>
-    <input id="bic-num" placeholder="KCBLTZTZ" maxlength="20" style="text-transform:uppercase" onkeydown="if(event.key==='Enter')checkBic()">
+    <input id="bic-num" placeholder="Tapez ici" maxlength="20" style="text-transform:uppercase" onkeydown="if(event.key==='Enter')checkBic()">
     <button class="btn" id="bic-btn" onclick="checkBic()">Identifier</button>
     <div class="result" id="bic-result"></div>
   </div>
@@ -1251,6 +1251,8 @@ function setLang(lang) {
   const sel = document.getElementById("lang-select");
   if (sel) sel.value = lang;
   translateAll();
+  const tapez = { fr: "Tapez ici", nl: "Typ hier", en: "Type here" }[lang] || "Tapez ici";
+  ["tva-num", "iban-num", "bic-num"].forEach(id => { const el = document.getElementById(id); if (el) el.placeholder = tapez; });
 }
 
 // traduit automatiquement tout contenu ajouté dynamiquement (résultats, compte, tarifs…)
