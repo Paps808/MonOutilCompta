@@ -18,6 +18,7 @@ const { execFile } = require("node:child_process");
 const PYTHON = process.platform === "win32" ? "python" : "python3";
 const billing = require("./billing.js");
 const news = require("./news.js");
+const bic = require("./bic.js");
 
 // 401 = compte requis, 402 = quota gratuit épuisé
 function sendQuotaError(res, q) {
@@ -754,6 +755,13 @@ const server = http.createServer(async (req, res) => {
       if (parts[1] === "vies" && parts.length === 4) return await handleVies(req, res, parts[2], parts[3]);
       if (parts[1] === "bce" && parts.length === 3) return await handleBce(res, parts[2]);
       if (parts[1] === "iban" && parts.length === 3) return await handleIban(req, res, parts[2]);
+      if (parts[1] === "bic" && parts.length === 3) {
+        const analyse = bic.analyserBic(decodeURIComponent(parts[2]));
+        if (!analyse.valide) return sendJson(res, 200, analyse); // format invalide : pas de quota consommé
+        const q = await billing.consumeQuota(req, "iban");
+        if (!q.allowed) return sendQuotaError(res, q);
+        return sendJson(res, 200, await bic.identifierBic(analyse.code));
+      }
       if (parts[1] === "pdf2word" && req.method === "POST") return await handlePdf2Word(req, res);
       return sendJson(res, 404, { error: "Route API inconnue" });
     }

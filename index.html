@@ -570,6 +570,16 @@
     <button class="btn" id="iban-btn" onclick="checkIban()">Valider</button>
     <div class="result" id="iban-result"></div>
   </div>
+
+  <div class="card" id="bic-card">
+    <h2>Identifier un code BIC / SWIFT</h2>
+    <p class="hint">Saisissez un code BIC de 8 ou 11 caractères (ex. <b>KCBLTZTZ</b>, <b>GEBABEBBXXX</b>) : nom de la banque,
+    adresse du siège, pays, agence et identifiant LEI. Sources : registre officiel GLEIF et base mondiale des codes SWIFT.</p>
+    <label>Code BIC / SWIFT</label>
+    <input id="bic-num" placeholder="KCBLTZTZ" maxlength="20" style="text-transform:uppercase" onkeydown="if(event.key==='Enter')checkBic()">
+    <button class="btn" id="bic-btn" onclick="checkBic()">Identifier</button>
+    <div class="result" id="bic-result"></div>
+  </div>
 </section>
 
 <!-- ============ DEVISES ============ -->
@@ -1928,6 +1938,12 @@ function nomPays(code) {
 async function checkIban() {
   const raw = document.getElementById("iban-num").value;
   if (!raw.trim()) return show("iban-result", "bad", "Saisissez un IBAN.");
+  // Un BIC saisi ici par erreur (les 5e-6e caractères d'un BIC sont des lettres, ceux d'un IBAN des chiffres)
+  const compact = raw.replace(/[\s.\-]/g, "").toUpperCase();
+  if (/^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(compact)) {
+    show("iban-result", "neutral", `« ${esc(compact)} » est un code BIC, pas un IBAN — identification ci-dessous.`);
+    return identifierBicDepuis(compact);
+  }
   track("tool", "validation-iban");
   const btn = document.getElementById("iban-btn");
   btn.disabled = true; btn.textContent = "Validation…";
@@ -1948,7 +1964,7 @@ async function checkIban() {
           <span class="k">IBAN formaté</span><span class="v">${esc(d.formatted)} <button class="copy" onclick="navigator.clipboard.writeText('${esc(d.iban)}')">copier</button></span>
           <span class="k">Pays</span><span class="v">${esc(nomPays(d.country))}</span>
           ${d.bankCode ? `<span class="k">Code banque</span><span class="v">${esc(d.bankCode)}</span>` : ""}
-          ${b && b.bic ? `<span class="k">BIC / SWIFT</span><span class="v">${esc(b.bic)} <button class="copy" onclick="navigator.clipboard.writeText('${esc(b.bic)}')">copier</button></span>` : ""}
+          ${b && b.bic ? `<span class="k">BIC / SWIFT</span><span class="v">${esc(b.bic)} <button class="copy" onclick="navigator.clipboard.writeText('${esc(b.bic)}')">copier</button> <button class="copy" onclick="identifierBicDepuis('${esc(b.bic)}')">identifier</button></span>` : ""}
           ${b && b.name ? `<span class="k">Banque</span><span class="v">${esc(b.name)}${b.city ? " — " + esc(b.city) : ""}</span>` : ""}
           ${b ? `<span class="k">Source BIC</span><span class="v">${esc(b.source || "-")}</span>` : ""}
         </div>
@@ -1959,6 +1975,54 @@ async function checkIban() {
     show("iban-result", "bad", "Erreur de connexion au serveur local : " + esc(e.message));
   } finally {
     btn.disabled = false; btn.textContent = "Valider";
+  }
+}
+
+/* ---------- identification BIC / SWIFT ---------- */
+function identifierBicDepuis(code) {
+  document.getElementById("bic-num").value = code;
+  document.getElementById("bic-card").scrollIntoView({ behavior: "smooth", block: "start" });
+  checkBic();
+}
+
+async function checkBic() {
+  const code = document.getElementById("bic-num").value.replace(/[\s.\-]/g, "").toUpperCase();
+  if (!code) return show("bic-result", "bad", "Saisissez un code BIC.");
+  track("tool", "identification-bic");
+  const btn = document.getElementById("bic-btn");
+  btn.disabled = true; btn.textContent = "Recherche…";
+  show("bic-result", "neutral", "⏳ Recherche dans les registres bancaires…");
+  try {
+    const r = await authFetch(`/api/bic/${encodeURIComponent(code)}`);
+    if (quotaBlocked(r, "bic-result")) return;
+    const d = await r.json();
+    refreshMe();
+    if (!d.valide) return show("bic-result", "bad", `<h3><span class="badge bad">✗ CODE BIC INVALIDE</span></h3><p style="margin-top:8px">${esc(d.erreur)}</p>`);
+    const ligne = (k, v) => v ? `<span class="k">${k}</span><span class="v">${v}</span>` : "";
+    const alertes = [
+      d.test ? "⚠️ Code de <b>test</b> (2e caractère de localité « 0 ») : il n'est pas utilisé pour de vrais paiements." : "",
+      d.passif ? "ℹ️ Participant <b>non connecté</b> directement au réseau SWIFT (localité se terminant par « 1 ») : les paiements transitent par une banque correspondante." : "",
+      d.actif === false ? "⚠️ L'entité est enregistrée comme <b>inactive</b> au registre GLEIF." : "",
+      d.viaSiege ? `ℹ️ L'agence « ${esc(d.agence)} » n'est pas détaillée dans les registres : informations du siège principal affichées.` : "",
+    ].filter(Boolean).map(t => `<p style="margin-top:8px;font-size:.86rem">${t}</p>`).join("");
+    show("bic-result", d.trouve ? "ok" : "warn", `
+      <h3><span class="badge ${d.trouve ? "ok" : "bad"}">${d.trouve ? "✓ BIC IDENTIFIÉ" : "? BIC NON RÉPERTORIÉ"}</span></h3>
+      ${d.trouve ? "" : `<p style="margin-top:8px">Le format est correct, mais ce code ne figure dans aucun des registres consultés. Vérifiez-le auprès du bénéficiaire avant tout virement.</p>`}
+      <div class="kv" style="margin-top:8px">
+        ${ligne("Code BIC", `${esc(d.bic11)} <button class="copy" onclick="navigator.clipboard.writeText('${esc(d.bic11)}')">copier</button>`)}
+        ${ligne("Banque", esc(d.nom || ""))}
+        ${ligne("Adresse du siège", esc(d.adresse || ""))}
+        ${ligne("Ville", !d.adresse ? esc(d.ville || "") : "")}
+        ${ligne("Pays", esc(nomPays(d.pays)))}
+        ${ligne("Agence", d.siege ? "XXX — siège principal" : esc(d.agence) + (d.nomAgence ? " — " + esc(d.nomAgence) : ""))}
+        ${ligne("Code banque / localité", `${esc(d.banque)} / ${esc(d.localite)}`)}
+        ${ligne("Identifiant LEI", d.lei ? esc(d.lei) : "")}
+        ${ligne("Sources", esc((d.sources || []).join(" + ")))}
+      </div>${alertes}`);
+  } catch (e) {
+    show("bic-result", "bad", "Erreur de connexion au serveur : " + esc(e.message));
+  } finally {
+    btn.disabled = false; btn.textContent = "Identifier";
   }
 }
 
